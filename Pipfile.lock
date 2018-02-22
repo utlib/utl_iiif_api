@@ -1,5 +1,30 @@
 {
-    "default": {},
+    "default": {
+        "djangorestframework": {
+            "version": "==3.6.2",
+            "hash": "sha256:3dc4bb6377dd1d58d8e2adc908d4f2e3bca5d8d0fb8323c49f57c8c8d407f6ec"
+        },
+        "django-rest-framework-mongoengine": {
+            "version": "==3.3.1",
+            "hash": "sha256:55d91ff4f26a424ec78cbe562b34d77f14015efff54ebf0952d6d88d52bb640d"
+        },
+        "six": {
+            "version": "==1.10.0",
+            "hash": "sha256:0ff78c403d9bccf5a425a6d31a12aa6b47f1c21ca4dc2573a7e2f32a97335eb1"
+        },
+        "pymongo": {
+            "version": "==3.4.0",
+            "hash": "sha256:8e0b5366f08875e6dfd4acf587c49eb813e8149106701f40dcca3ccfb14c1f5d"
+        },
+        "mongoengine": {
+            "version": "==0.11.0",
+            "hash": "sha256:39532b0d2d26de3bb2bb174fef0209bb1925f81942b999808050d99917c0c6b9"
+        },
+        "Django": {
+            "version": "==1.10.5",
+            "hash": "sha256:4541a60834f28f308ee7b6e96400feca905fb0de473eb9dad6847e98a36d86d4"
+        }
+    },
     "develop": {},
     "_meta": {
         "sources": [
@@ -10,7 +35,7 @@
         ],
         "requires": {},
         "hash": {
-            "sha256": "cb65967bdf3a7372749ce6144be4ee63f412aeeac624342fda3a2b58b1c43c15"
+            "sha256": "40578cf28678805cc96044fb22612b23a89570c50ef008c1e9fe03bd156eeb11"
         }
     }
 }

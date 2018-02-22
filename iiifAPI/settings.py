@@ -25,7 +25,7 @@ SECRET_KEY = '9*zibp0m7#7e#rz#j)(6=-v99cxcd3(85@d)rxcmy54nqq*%qj'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['142.150.192.147']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_mongoengine',
 ]
 
 MIDDLEWARE = [
@@ -118,10 +119,29 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.10/howto/static-files/
 
+STATIC_ROOT = os.path.join(BASE_DIR, "static/")
 STATIC_URL = '/static/'
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAdminUser',
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
+    'DEFAULT_RENDERER_CLASSES': (
+        'iiif_api_services.jsonLDrenderer.JSONLDRenderer',
+        # 'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ),
+    'TEST_REQUEST_DEFAULT_FORMAT': 'json'
+}
+
+import mongoengine
+mongoengine.connect(
+    db="iiifAPI",
+    host="localhost"
+)
+
+TEST_MONGO_DATABASE = {
+    'db': 'iiifAPI_testing',
+    'host': ['localhost'],
+    'port': 27017,
 }

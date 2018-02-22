@@ -3,5 +3,11 @@ url = "https://pypi.python.org/simple"
 verify_ssl = true
 
 [packages]
-Django = "==1.10.5"
 djangorestframework = "*"
+django-rest-framework-mongoengine = "==3.3.1"
+mongoengine = "==0.11.0"
+pymongo = "==3.4.0"
+django-test-addons = "*"
+coreapi = "*"
+Django = "==1.10.5"
+Markdown = "*"
