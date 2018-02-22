@@ -1,139 +1,116 @@
-from iiif_api_services.serializers.RangeSerializer import *
-from iiif_api_services.models import *
-from rest_framework_mongoengine import viewsets
+import json
+from datetime import datetime
+from django.conf import settings # import the settings file to get IIIF_BASE_URL
+from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from iiif_api_services.serializers.RangeSerializer import *
+from iiif_api_services.serializers.CanvasSerializer import *
+from iiif_api_services.views.CanvasView import CanvasViewSet
+from iiif_api_services.models.QueueModel import Queue
+from iiif_api_services.models.ActivityModel import Activity
+from iiif_api_services.views.BackgroundProcessing import viewRange, createRange, updateRange, destroyRange
+if settings.QUEUE_RUNNER=="PROCESS":
+    from multiprocessing import Process as Runner
+elif settings.QUEUE_RUNNER=="THREAD":
+    from threading import Thread as Runner
 
 
-class RangeViewSet(viewsets.ModelViewSet):
-    '''
-    API endpoint that allows Range to be created, viewed, edited or deleted
-    '''
-    serializer_class = RangeSerializer
-    queryset = Range.objects.all()
-    pagination_class = None
+def initializeNewBulkActions():
+    return {"Collection": [], "Manifest": [], "Sequence": [], "Range": [], "Canvas": [], "Annotation": [], "AnnotationList": [], "Layer": []}
 
 
-    def create(self, request, item=None, format=None):
-        '''
-        Create a Range for this item
-        '''
+
+class RangeViewSet(ViewSet):
+    # GET /:identifier/range
+    def list(self, request, identifier=None, format=None):
         try:
-            name = request.data['label'].replace(" ", "")
-            range = Range.objects.get(item=item, name=name)
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Range name already exist in this item."})
-        except:
-            data = request.data
-            serializer = RangeSerializer(data=data, context={'request': request})
-            if serializer.is_valid():
-                name = request.data['label'].replace(" ", "")
-                serializer.save(name=name, item=item)
-                return self.retrieve(request, item=item, name=name, format=format)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-    def list(self, request, item=None, format=None):
-        '''
-        View all Ranges in this item
-        '''
-        try:
-            range = Range.objects(item=item)
-            if range:
-                serializer = EmbeddedRangeSerializer(range, context={'request': request}, many=True)
-                return Response(serializer.data)
-            else:
-                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such Item exist."})           
-        except Exception as e:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
-
-
-
-    def retrieve(self, request, item=None, name=None, format=None):
-        '''
-        View this Range to Update or Delete
-        '''
-        try:
-            range = Range.objects.get(item=item, name=name)
-            serializer = RangeSerializer(range, context={'request': request})
-            return Response(serializer.data)
-        except Range.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such Range exist in this item."})
-        except:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
-
-
-
-
-    def update(self, request, item=None, name=None, format=None):
-        '''
-        Update this Range
-        '''
-        try:
-            range = Range.objects.get(item=item, name=name)
-            serializer = RangeSerializer(range, data=request.data, context={'request': request})
-            if serializer.is_valid():
-                old_range_name = range.name
-                new_range_name = request.data['label'].replace(" ", "")
-                if old_range_name != new_range_name:
-                    try:
-                        Range.objects.get(item=item, name=new_range_name)
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "Cannot create a duplicate Range within the same Item."})
-                    except:
-                        pass
-                serializer.save(name=new_range_name, item=item)
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Range.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-    def destroy(self, request, item=None, name=None, format=None):
-        '''
-        Delete this Range
-        '''
-        try:
-            range = Range.objects.get(item=item, name=name)
-            range.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': "Sucessfully deleted this Range within the Item."})
-        except Range.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-class SearchRangeViewSet(viewsets.ReadOnlyModelViewSet):
-    '''
-    API endpoint that allows Ranges to be searched
-    '''
-    queryset = Range.objects.all()
-    serializer_class = RangeSerializer
-    pagination_class = None
-
-    def retrieve(self, request, query=None, format=None):
-        '''
-        Search for Ranges matching the query
-        '''
-        try:
-            fields = query.split("&")
-            query = {}
-            for field in fields:
-                q = field.split("=")
-                query[q[0].strip()+'__icontains'] = q[1].strip()
-            ranges = Range.objects(**query)
+            ranges = Range.objects(identifier=identifier)
             if ranges:
-                serializer = EmbeddedRangeSerializer(ranges, context={'request': request}, many=True)
-                return Response(serializer.data)
-            raise Range.DoesNotExist
-        except Range.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No Ranges found matching the query."})
-        except IndexError:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "The search query format is invalid."})
-        except Exception as e:
+                rangesSerializer = RangeEmbeddedSerializer(ranges, context={'request': request}, many=True)
+                return Response(rangesSerializer.data)
+            else:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "Item with name '" + identifier + "' does not exist."})           
+        except Exception as e: # pragma: no cover
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
+
+
+    # GET /:identifier/range/:name
+    def retrieve(self, request, identifier=None, name=None, format=None):
+        try:
+            range = Range.objects.get(identifier=identifier, name=name)
+            return Response(viewRange(range))
+        except Range.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "Range with name '" + name + "' does not exist in identifier '" + identifier + "'."}) 
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message})
+
+
+    def createBackground(self, request, identifier=None, format=None):
+        try:
+            requestBody = json.loads(request.body)["range"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_POST_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=createRange, args=(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    createRange.delay(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = createRange(user, identifier, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+
+
+    def updateBackground(self, request, identifier=None, name=None, format=None):
+        try:
+            requestBody = json.loads(request.body)["range"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_POST_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=updateRange, args=(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    updateRange.delay(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = updateRange(user, identifier, name, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+
+
+    def destroyBackground(self, request, identifier=None, name=None, format=None):
+        try:
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_DELETE_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=destroyRange, args=(user, identifier, name, False, str(queue.id), str(activity.id))).start()
+                else:
+                    destroyRange.delay(user, identifier, name, False, str(queue.id), str(activity.id))
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.save()
+                result = destroyRange(user, identifier, name, False, None, str(activity.id))
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+

@@ -1,139 +1,117 @@
-from iiif_api_services.serializers.AnnotationListSerializer import *
-from iiif_api_services.models import *
-from rest_framework_mongoengine import viewsets
+import json
+from datetime import datetime
+from django.conf import settings # import the settings file to get IIIF_BASE_URL
+from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from iiif_api_services.serializers.AnnotationListSerializer import *
+from iiif_api_services.serializers.AnnotationSerializer import *
+from iiif_api_services.views.AnnotationView import AnnotationViewSet
+from iiif_api_services.models.QueueModel import Queue
+from iiif_api_services.models.ActivityModel import Activity
+from iiif_api_services.views.BackgroundProcessing import viewAnnotationList, createAnnotationList, updateAnnotationList, destroyAnnotationList
+if settings.QUEUE_RUNNER=="PROCESS":
+    from multiprocessing import Process as Runner
+elif settings.QUEUE_RUNNER=="THREAD":
+    from threading import Thread as Runner
 
 
-class AnnotationListViewSet(viewsets.ModelViewSet):
-    '''
-    API endpoint that allows AnnotationList to be created, viewed, edited or deleted
-    '''
-    serializer_class = AnnotationListSerializer
-    queryset = AnnotationList.objects.all()
-    pagination_class = None
+def initializeNewBulkActions():
+    return {"Collection": [], "Manifest": [], "Sequence": [], "Range": [], "Canvas": [], "Annotation": [], "AnnotationList": [], "Layer": []}
 
 
-    def create(self, request, item=None, format=None):
-        '''
-        Create a AnnotationList for this item
-        '''
+
+class AnnotationListViewSet(ViewSet):
+    # GET /:identifier/annotationList
+    def list(self, request, identifier=None, format=None):
         try:
-            name = request.data['label'].replace(" ", "")
-            annotationlist = AnnotationList.objects.get(item=item, name=name)
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "AnnotationList name already exist in this item."})
-        except:
-            data = request.data
-            serializer = AnnotationListSerializer(data=data, context={'request': request})
-            if serializer.is_valid():
-                name = request.data['label'].replace(" ", "")
-                serializer.save(name=name, item=item)
-                return self.retrieve(request, item=item, name=name, format=format)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-    def list(self, request, item=None, format=None):
-        '''
-        View all AnnotationLists in this item
-        '''
-        try:
-            annotationlist = AnnotationList.objects(item=item)
-            if annotationlist:
-                serializer = EmbeddedAnnotationListSerializer(annotationlist, context={'request': request}, many=True)
-                return Response(serializer.data)
+            annotationLists = AnnotationList.objects(identifier=identifier)
+            if annotationLists:
+                annotationListsSerializer = AnnotationListEmbeddedSerializer(annotationLists, context={'request': request}, many=True)
+                return Response(annotationListsSerializer.data)
             else:
-                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such Item exist."})           
-        except Exception as e:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "Item with name '" + identifier + "' does not exist."})           
+        except Exception as e: # pragma: no cover
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
 
 
-
-    def retrieve(self, request, item=None, name=None, format=None):
-        '''
-        View this AnnotationList to Update or Delete
-        '''
+    # GET /:identifier/annotationList/:name
+    def retrieve(self, request, identifier=None, name=None, format=None):
         try:
-            annotationlist = AnnotationList.objects.get(item=item, name=name)
-            serializer = AnnotationListSerializer(annotationlist, context={'request': request})
-            return Response(serializer.data)
+            annotationList = AnnotationList.objects.get(identifier=identifier, name=name)
+            return Response(viewAnnotationList(annotationList))
         except AnnotationList.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such AnnotationList exist in this item."})
-        except:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "AnnotationList with name '" + name + "' does not exist in identifier '" + identifier + "'."}) 
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message})
 
 
-
-
-    def update(self, request, item=None, name=None, format=None):
-        '''
-        Update this AnnotationList
-        '''
+    def createBackground(self, request, identifier=None, format=None):
         try:
-            annotationlist = AnnotationList.objects.get(item=item, name=name)
-            serializer = AnnotationListSerializer(annotationlist, data=request.data, context={'request': request})
-            if serializer.is_valid():
-                old_annotationlist_name = annotationlist.name
-                new_annotationlist_name = request.data['label'].replace(" ", "")
-                if old_annotationlist_name != new_annotationlist_name:
-                    try:
-                        AnnotationList.objects.get(item=item, name=new_annotationlist_name)
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "Cannot create a duplicate AnnotationList within the same Item."})
-                    except:
-                        pass
-                serializer.save(name=new_annotationlist_name, item=item)
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except AnnotationList.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            requestBody = json.loads(request.body)["annotationList"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_POST_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=createAnnotationList, args=(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    createAnnotationList.delay(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = createAnnotationList(user, identifier, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
 
 
-
-
-    def destroy(self, request, item=None, name=None, format=None):
-        '''
-        Delete this AnnotationList
-        '''
+    def updateBackground(self, request, identifier=None, name=None, format=None):
         try:
-            annotationlist = AnnotationList.objects.get(item=item, name=name)
-            annotationlist.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': "Sucessfully deleted this AnnotationList within the Item."})
-        except AnnotationList.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            requestBody = json.loads(request.body)["annotationList"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_PUT_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=updateAnnotationList, args=(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    updateAnnotationList.delay(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = updateAnnotationList(user, identifier, name, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
 
 
-
-
-class SearchAnnotationListViewSet(viewsets.ReadOnlyModelViewSet):
-    '''
-    API endpoint that allows AnnotationLists to be searched
-    '''
-    queryset = AnnotationList.objects.all()
-    serializer_class = AnnotationListSerializer
-    pagination_class = None
-
-    def retrieve(self, request, query=None, format=None):
-        '''
-        Search for AnnotationLists matching the query
-        '''
+    def destroyBackground(self, request, identifier=None, name=None, format=None):
         try:
-            fields = query.split("&")
-            query = {}
-            for field in fields:
-                q = field.split("=")
-                query[q[0].strip()+'__icontains'] = q[1].strip()
-            annotationlists = AnnotationList.objects(**query)
-            if annotationlists:
-                serializer = EmbeddedAnnotationListSerializer(annotationlists, context={'request': request}, many=True)
-                return Response(serializer.data)
-            raise AnnotationList.DoesNotExist
-        except AnnotationList.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No AnnotationLists found matching the query."})
-        except IndexError:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "The search query format is invalid."})
-        except Exception as e:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_DELETE_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=destroyAnnotationList, args=(user, identifier, name, False, str(queue.id), str(activity.id))).start()
+                else:
+                    destroyAnnotationList.delay(user, identifier, name, False, str(queue.id), str(activity.id))
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.save()
+                result = destroyAnnotationList(user, identifier, name, False, None, str(activity.id))
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+

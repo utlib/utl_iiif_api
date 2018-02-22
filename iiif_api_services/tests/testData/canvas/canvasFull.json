@@ -1,0 +1,73 @@
+{
+  "@id": "https://wellcomelibrary.org/iiif/book1/canvas/c0",
+  "@type": "sc:Canvas",
+  "label": "Canvas c0",
+  "thumbnail": {
+    "@id": "https://dlcs.io/thumbs/wellcome/1/anno-1/full/61,100/0/default.jpg",
+    "@type": "dctypes:Image",
+    "service": {
+      "@context": "http://iiif.io/api/image/2/context.json",
+      "@id": "https://dlcs.io/thumbs/wellcome/1/anno-1",
+      "protocol": "http://iiif.io/api/image",
+      "height": 1024,
+      "width": 623,
+      "sizes": [
+        {
+          "width": 61,
+          "height": 100
+        },
+        {
+          "width": 122,
+          "height": 200
+        },
+        {
+          "width": 243,
+          "height": 400
+        },
+        {
+          "width": 623,
+          "height": 1024
+        }
+      ],
+      "profile": [
+        "http://iiif.io/api/image/2/level0.json"
+      ]
+    }
+  },
+  "seeAlso": {
+    "@id": "https://wellcomelibrary.org/service/alto/book1/0?image=0",
+    "format": "text/xml",
+    "profile": "http://www.loc.gov/standards/alto/v3/alto.xsd",
+    "label": "METS-ALTO XML"
+  },
+  "height": 3179,
+  "width": 1933,
+  "images": [
+    {
+      "@id": "https://wellcomelibrary.org/iiif/book1/imageanno/anno-1",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://dlcs.io/iiif-img/wellcome/1/anno-1/full/!1024,1024/0/default.jpg",
+        "@type": "dctypes:Image",
+        "format": "image/jpeg",
+        "height": 1024,
+        "width": 623,
+        "service": {
+          "@context": "http://iiif.io/api/image/2/context.json",
+          "@id": "https://dlcs.io/iiif-img/wellcome/1/anno-1",
+          "profile": "http://iiif.io/api/image/2/level1.json"
+        }
+      },
+      "on": "https://wellcomelibrary.org/iiif/book1/canvas/c0"
+    }
+  ],
+  "otherContent": [
+    {
+      "@id": "https://wellcomelibrary.org/iiif/book1/contentAsText/0",
+      "@type": "sc:AnnotationList",
+      "label": "Text of this page"
+    }
+  ]
+
+}

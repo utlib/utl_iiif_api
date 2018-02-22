@@ -1,0 +1,6 @@
+{
+  "@id": "http://example.org/iiif/book1/range/r0",
+  "@type": "sc:Range",
+  "label": "Table of Contents",
+  "viewingHint": "top"
+}

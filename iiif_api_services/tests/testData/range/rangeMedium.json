@@ -1,0 +1,49 @@
+{
+  "@id": "http://example.org/iiif/book1/range/r0",
+  "@type": "sc:Range",
+  "label": "Table of Contents",
+  "viewingHint": "top",
+  "members": [
+    {
+      "@id": "http://example.org/iiif/book1/canvas/cover",
+      "@type": "sc:Canvas",
+      "label": "Front Cover"
+    },
+    {
+      "@id": "http://example.org/iiif/book1/range/r1",
+      "@type": "sc:Range",
+      "label": "Introduction",
+      "contentLayer": "http://example.org/iiif/book1/layer/introTexts"
+    },
+    {
+      "@id": "http://example.org/iiif/book1/canvas/backCover",
+      "@type": "sc:Canvas",
+      "label": "Back Cover"
+    }
+  ],
+  "canvases": [
+    {
+      "@id": "http://example.org/iiif/book1/canvas/coverBack",
+      "@type": "sc:Canvas",
+      "label": "Back Cover"
+    },
+    {
+      "@id": "http://example.org/iiif/book1/canvas/coverBack2",
+      "@type": "sc:Canvas",
+      "label": "Back Cover"
+    }
+  ],
+  "ranges": [
+    {
+      "@id": "http://example.org/iiif/book1/range/r2",
+      "@type": "sc:Range",
+      "label": "Introduction",
+      "contentLayer": "http://example.org/iiif/book1/layer/introTexts"
+    },
+    {
+      "@id": "http://example.org/iiif/book1/range/r3",
+      "@type": "sc:Range",
+      "label": "Introduction"
+    }
+  ]
+}

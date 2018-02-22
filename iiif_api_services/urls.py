@@ -1,224 +1,257 @@
 from django.conf.urls import url, include
-from .views.CollectionView import CollectionViewSet, SearchCollectionViewSet
-from .views.ManifestView import ManifestViewSet, SearchManifestViewSet
-from .views.SequenceView import SequenceViewSet, SearchSequenceViewSet
-from .views.CanvasView import CanvasViewSet, SearchCanvasViewSet
-from .views.AnnotationView import AnnotationViewSet, SearchAnnotationViewSet
-from .views.AnnotationListView import AnnotationListViewSet, SearchAnnotationListViewSet
-from .views.RangeView import RangeViewSet, SearchRangeViewSet
-from .views.LayerView import LayerViewSet, SearchLayerViewSet
-from .views.ResourceView import ResourceViewSet, SearchResourceViewSet
-from .views.GlobalSearchView import GlobalSearchViewSet
-
+from .views.CollectionView import CollectionViewSet
+from .views.ManifestView import ManifestViewSet
+from .views.SequenceView import SequenceViewSet
+from .views.CanvasView import CanvasViewSet
+from .views.AnnotationView import AnnotationViewSet
+from .views.AnnotationListView import AnnotationListViewSet
+from .views.RangeView import RangeViewSet
+from .views.LayerView import LayerViewSet
+from .views.SearchView import SearchViewSet
+from .views.ImageUploadView import ImageUploadViewSet
+from .views.ActivityView import ActivityViewSet
+from .views.QueueView import QueueViewSet
+from .views.AdminView import AdminView
+from rest_framework_jwt.views import obtain_jwt_token
+from rest_framework_jwt.views import verify_jwt_token
+from django.shortcuts import render
 from django.http import JsonResponse
 from rest_framework import status
-
 from rest_framework.urlpatterns import format_suffix_patterns
-from rest_framework.documentation import include_docs_urls
+
+
+def docs(request, path=''):
+  """
+  Render the interactive documentation
+  """
+  return render(request, 'docs.html')
 
 
 def invalid_api_endpoint(request):
-	return JsonResponse(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "This API endpoint is invalid."})
+    """
+    return an invalid endpoint response message
+    """
+    return JsonResponse(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "This API endpoint is invalid."})
 
 
-api_root = CollectionViewSet.as_view({
-	'get': 'list',
-	})
+admin_register = AdminView.as_view({
+    'post': 'createAdmin',
+})
+
+staff_list = AdminView.as_view({
+    'post': 'createStaff',
+    'get': 'viewStaffs',
+})
+
+staff_detail = AdminView.as_view({
+    'put': 'updateStaff',
+    'delete': 'deleteStaff',
+})
+
+update_permission = AdminView.as_view({
+    'put': 'updatePermission',
+})
 
 collection_list = CollectionViewSet.as_view({
-	'get': 'list',
-	'post': 'create',
-	})
+    'get': 'list',
+    'post': 'createBackground',
+})
 
 collection_detail = CollectionViewSet.as_view({
-	'get': 'retrieve',
-	'put': 'update',
-	'delete': 'destroy',
-	})
-
-collection_search = SearchCollectionViewSet.as_view({
-	'get': 'retrieve',
-	})
+    'get': 'retrieve',
+    'put': 'updateBackground',
+    'delete': 'destroyBackground',
+})
 
 
 manifest_detail = ManifestViewSet.as_view({
-	'get': 'retrieve',
-	'put': 'update',
-	'delete': 'destroy',
-	'post': 'create',
-	})
-
-manifest_search = SearchManifestViewSet.as_view({
-	'get': 'retrieve',
-	})
+    'get': 'retrieve',
+    'put': 'updateBackground',
+    'delete': 'destroyBackground',
+    'post': 'createBackground',
+})
 
 
 sequence_list = SequenceViewSet.as_view({
-	'get': 'list',
-	'post': 'create',
-	})
+    'get': 'list',
+    'post': 'createBackground',
+})
 
 sequence_detail = SequenceViewSet.as_view({
-	'get': 'retrieve',
-	'put': 'update',
-	'delete': 'destroy',
-	})
-
-sequence_search = SearchSequenceViewSet.as_view({
-	'get': 'retrieve',
-	})
+    'get': 'retrieve',
+    'put': 'updateBackground',
+    'delete': 'destroyBackground',
+})
 
 
 canvas_list = CanvasViewSet.as_view({
-	'get': 'list',
-	'post': 'create',
-	})
+    'get': 'list',
+    'post': 'createBackground',
+})
 
 canvas_detail = CanvasViewSet.as_view({
-	'get': 'retrieve',
-	'put': 'update',
-	'delete': 'destroy',
-	})
-
-canvas_search = SearchCanvasViewSet.as_view({
-	'get': 'retrieve',
-	})
+    'get': 'retrieve',
+    'put': 'updateBackground',
+    'delete': 'destroyBackground',
+})
 
 
 annotation_list = AnnotationViewSet.as_view({
-	'get': 'list',
-	'post': 'create',
-	})
+    'get': 'list',
+    'post': 'createBackground',
+})
 
 annotation_detail = AnnotationViewSet.as_view({
-	'get': 'retrieve',
-	'put': 'update',
-	'delete': 'destroy',
-	})
+    'get': 'retrieve',
+    'put': 'updateBackground',
+    'delete': 'destroyBackground',
+})
 
-annotation_search = SearchAnnotationViewSet.as_view({
-	'get': 'retrieve',
-	})
 
 annotationlist_list = AnnotationListViewSet.as_view({
-	'get': 'list',
-	'post': 'create',
-	})
+    'get': 'list',
+    'post': 'createBackground',
+})
 
 annotationlist_detail = AnnotationListViewSet.as_view({
-	'get': 'retrieve',
-	'put': 'update',
-	'delete': 'destroy',
-	})
-
-annotationlist_search = SearchAnnotationListViewSet.as_view({
-	'get': 'retrieve',
-	})
+    'get': 'retrieve',
+    'put': 'updateBackground',
+    'delete': 'destroyBackground',
+})
 
 
 range_list = RangeViewSet.as_view({
-	'get': 'list',
-	'post': 'create',
-	})
+    'get': 'list',
+    'post': 'createBackground',
+})
 
 range_detail = RangeViewSet.as_view({
-	'get': 'retrieve',
-	'put': 'update',
-	'delete': 'destroy',
-	})
-
-
-range_search = SearchRangeViewSet.as_view({
-	'get': 'retrieve',
-	})
+    'get': 'retrieve',
+    'put': 'updateBackground',
+    'delete': 'destroyBackground',
+})
 
 
 layer_list = LayerViewSet.as_view({
-	'get': 'list',
-	'post': 'create',
-	})
+    'get': 'list',
+    'post': 'createBackground',
+})
 
 layer_detail = LayerViewSet.as_view({
-	'get': 'retrieve',
-	'put': 'update',
-	'delete': 'destroy',
-	})
-
-layer_search = SearchLayerViewSet.as_view({
-	'get': 'retrieve',
-	})
+    'get': 'retrieve',
+    'put': 'updateBackground',
+    'delete': 'destroyBackground',
+})
 
 
-resource_list = ResourceViewSet.as_view({
-	'get': 'list',
-	'post': 'create',
-	})
+discovery = ActivityViewSet.as_view({
+    'get': 'discovery',
+})
 
-resource_detail = ResourceViewSet.as_view({
-	'get': 'retrieve',
-	'put': 'update',
-	'delete': 'destroy',
-	})
+discoveryDateRange = ActivityViewSet.as_view({
+    'get': 'discoveryDateRange',
+})
 
+activity = ActivityViewSet.as_view({
+    'get': 'activity',
+    'delete': 'delete',
+})
 
-resource_search = SearchResourceViewSet.as_view({
-	'get': 'retrieve',
-	})
+activityDeleteAll = ActivityViewSet.as_view({
+    'get': 'viewAll',
+    'delete': 'deleteAll',
+})
 
+queue = QueueViewSet.as_view({
+    'get': 'retrieve',
+})
 
-global_search = GlobalSearchViewSet.as_view({
-	'get': 'retrieve',
-	})
+queueViewAll = QueueViewSet.as_view({
+    'get': 'viewAll',
+})
 
+search = SearchViewSet.as_view({
+    'get': 'retrieve',
+})
+
+iiifSearchWithinManifest = SearchViewSet.as_view({
+    'get': 'iiifSearchWithinManifest',
+})
+
+imageUpload = ImageUploadViewSet.as_view({
+    'post': 'uploadImage'    
+})
 
 
 urlpatterns = [
-	url(r'^$', api_root, name="api-root"),
+    # API Docs Endpoint
+    url(r'^$', docs),
 
-	url(r'^collections/$', collection_list, name="collection-list"),
-	url(r'^collections/(?P<name>[a-zA-Z0-9_]+)/$', collection_detail, name="collection-detail"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/manifest/$', manifest_detail, name="manifest-detail"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/sequence/$', sequence_list, name="sequence-list"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/sequence/(?P<name>[a-zA-Z0-9_]+)$', sequence_detail, name="sequence-detail"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/canvas/$', canvas_list, name="canvas-list"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/canvas/(?P<name>[a-zA-Z0-9_]+)$', canvas_detail, name="canvas-detail"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/annotation/$', annotation_list, name="annotation-list"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/annotation/(?P<name>[a-zA-Z0-9_]+)$', annotation_detail, name="annotation-detail"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/list/$', annotationlist_list, name="annotationlist-list"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/list/(?P<name>[a-zA-Z0-9_]+)$', annotationlist_detail, name="annotationlist-detail"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/range/$', range_list, name="range-list"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/range/(?P<name>[a-zA-Z0-9_]+)$', range_detail, name="range-detail"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/layer/$', layer_list, name="layer-list"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/layer/(?P<name>[a-zA-Z0-9_]+)$', layer_detail, name="layer-detail"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/res/$', resource_list, name="resource-list"),
-	url(r'^(?P<item>[a-zA-Z0-9_]+)/res/(?P<name>[\w.]+)$', resource_detail, name="resource-detail"),
+    # Auth Endpoints
+    url(r'^auth/admin$', admin_register, name="user-register"),
+    url(r'^auth/admin/updatePermission$', update_permission, name="update_permission"),
+    url(r'^auth/staff$', staff_list, name="staff-list"),
+    url(r'^auth/staff/(?P<id>[a-zA-Z0-9_:-]+)$', staff_detail, name="staff-details"),
+    url(r'^login$', obtain_jwt_token, name="obtain-jwt-token"),
+    url(r'^verifyToken$', verify_jwt_token),
 
+    # Collection Endpoints
+    url(r'^collections$', collection_list, name="collection-list"),
+    url(r'^collection$', collection_list, name="collection-list"),
+    url(r'^collections/(?P<name>[a-zA-Z0-9_:-]+)$', collection_detail, name="collection-detail"),
+    url(r'^collection/(?P<name>[a-zA-Z0-9_:-]+)$', collection_detail, name="collection-detail"),
 
-	url(r'^search/collections/(?P<query>[a-zA-Z0-9 _=&]+)$', collection_search, name="collection-search"),
-	url(r'^search/manifests/(?P<query>[a-zA-Z0-9 _=&]+)$', manifest_search, name="manifest-search"),
-	url(r'^search/sequences/(?P<query>[a-zA-Z0-9 _=&]+)$', sequence_search, name="sequence-search"),
-	url(r'^search/canvases/(?P<query>[a-zA-Z0-9 _=&]+)$', canvas_search, name="canvas-search"),
-	url(r'^search/annotations/(?P<query>[a-zA-Z0-9 _=&]+)$', annotation_search, name="annotation-search"),
-	url(r'^search/list/(?P<query>[a-zA-Z0-9 _=&]+)$', annotationlist_search, name="annotationlist-search"),
-	url(r'^search/ranges/(?P<query>[a-zA-Z0-9 _=&]+)$', range_search, name="range-search"),
-	url(r'^search/layers/(?P<query>[a-zA-Z0-9 _=&]+)$', layer_search, name="layer-search"),
-	url(r'^search/res/(?P<query>[a-zA-Z0-9 _=&]+)$', resource_search, name="resource-search"),
+    # Manifest Endpoints
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/manifest$', manifest_detail, name="manifest-detail"),
 
-	url(r'^search/(?P<query>[a-zA-Z0-9 _=&]+)$', global_search, name="global-search"),
+    # Sequence Endpoints
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/sequence$', sequence_list, name="sequence-list"),
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/sequence/(?P<name>[a-zA-Z0-9_:-]+)$', sequence_detail, name="sequence-detail"),
 
+    # Canvas Endpoints
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/canvas$', canvas_list, name="canvas-list"),
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/canvas/(?P<name>[a-zA-Z0-9_:-=,\#]+)$', canvas_detail, name="canvas-detail"),
 
-    url(r'^docs/', include_docs_urls(title='University of Toronto')),
+    # Annotation Endpoints
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/annotation$', annotation_list, name="annotation-list"),
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/annotation/(?P<name>[a-zA-Z0-9_:-]+)$', annotation_detail, name="annotation-detail"),
 
+    # Annotationlist Endpoints
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/list$', annotationlist_list, name="annotationlist-list"),
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/list/(?P<name>[a-zA-Z0-9_:-]+)$', annotationlist_detail, name="annotationlist-detail"),
 
-	url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    # Range Endpoints
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/range$', range_list, name="range-list"),
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/range/(?P<name>[a-zA-Z0-9_:-]+)$', range_detail, name="range-detail"),
 
+    # Layer Endpoints
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/layer$', layer_list, name="layer-list"),
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/layer/(?P<name>[a-zA-Z0-9_:-]+)$', layer_detail, name="layer-detail"),
+   
+    # Search Endpoint
+    url(r'^search/(?P<type>[a-zA-Z0-9]+)/', search, name="search"),
 
-	url(r'.*', invalid_api_endpoint),
+    # Discovery Endpoint
+    url(r'^discovery(?P<page>\s{0}|[-]{1}[0-9]+)$', discovery, name="discovery"),
+    url(r'^discovery(?P<page>\s{0}|[-]{1}[0-9]+)/', discoveryDateRange, name="discoveryDateRange"),
+
+    # Activity Endpoints
+    url(r'^activity/(?P<id>[a-zA-Z0-9]+)$', activity, name="activity"),
+    url(r'^activity$', activityDeleteAll, name="activityDeleteAll"),
+
+    # Queue Endpoints
+    url(r'^queue/(?P<id>[a-zA-Z0-9]+)$', queue, name="queue"),
+    url(r'^queue$', queueViewAll, name="queueViewAll"),
+
+    # Image Upload
+    url(r'^images$', imageUpload, name="imageUpload"),
+
+    # IIIF Search API Endpoint - Search Annotations within a Manifest
+    url(r'^(?P<identifier>[a-zA-Z0-9_:-]+)/manifest/search/', iiifSearchWithinManifest, name="iiifSearchWithinManifest"),
+
+    # Invalid Endpoint
+    url(r'.*', invalid_api_endpoint),
 ]
 
-
 urlpatterns = format_suffix_patterns(urlpatterns)
-
-
-
 

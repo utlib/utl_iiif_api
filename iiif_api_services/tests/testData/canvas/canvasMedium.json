@@ -1,0 +1,40 @@
+{
+  "@id": "http://example.org/iiif/book1/canvas/p1",
+  "@type": "sc:Canvas",
+  "label": "p. 1",
+  "height": 1000,
+  "width": 750,
+  "thumbnail" : {
+    "@id" : "http://example.org/iiif/book1/canvas/p1/thumb.jpg",
+    "@type": "dctypes:Image",
+    "height": 200,
+    "width": 150
+  },
+  "images": [
+    {
+    "@type": "oa:Annotation",
+    "motivation": "sc:painting",
+    "stylesheet":{
+      "@type": ["oa:CssStyle", "cnt:ContentAsText"],
+      "chars": ".red {color: red;}"
+    },
+    "resource":{
+      "@id": "https://dlcs.io/iiif-img/wellcome/1/8d2ad60b-1ca6-4a80-a0b1-b3aca48a62a1/full/!1024,1024/0/default.jpg",
+      "@type": "oa:SpecificResource",
+      "format": "image/jpeg",
+      "style": "red",
+      "full": {
+        "@type": "cnt:ContentAsText",
+        "chars": "Rubrics are Red, ..."
+      }
+    },
+    "on": "http://example.org/iiif/book1/canvas/p1#xywh=100,150,500,30"
+    }
+  ],
+  "otherContent": [
+    {
+      "@id": "http://example.org/iiif/book1/list/p1",
+      "@type": "sc:AnnotationList"
+    }
+  ]
+}

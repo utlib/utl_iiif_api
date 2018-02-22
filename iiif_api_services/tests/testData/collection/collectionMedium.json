@@ -1,0 +1,36 @@
+{
+  "@id": "http://example.org/iiif/collection/book1",
+  "label": "some collection label parent",
+  "collections": [
+    {
+      "@id": "http://example.org/iiif/collection/top6",
+      "label": "some collection label child"
+    },
+    {
+      "@id": "http://example.org/iiif/collection/top98",
+      "label": "anothoer collection label child"
+    }
+  ],
+  "manifests": [
+    {
+    "@id": "http://example.org/iiif/book1/manifest",
+    "label": "some manifest label parent"
+    },
+    {
+    "@id": "http://example.org/iiif/book2/manifest",
+    "label": "some manifest label"
+    }
+  ],
+  "members": [
+    {
+    "@id": "http://example.org/iiif/book3/manifest",
+    "label": "some manifest label parent",
+    "@type": "sc:Manifest"
+    },
+    {
+    "@id": "http://example.org/iiif/collection/top6666",
+    "label": "some manifest label",
+    "@type": "sc:Collection"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "@context": "http://iiif.io/api/presentation/2/context.json",
+  "@id": "http://example.org/iiif/book1/annotation/p0001-image",
+  "@type": "oa:Annotation",
+  "motivation": "sc:painting",
+  "label": "Cool annotation",
+  "on": "http://example.org/iiif/book1/canvas/p1"
+}

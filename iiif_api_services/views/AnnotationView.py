@@ -1,138 +1,114 @@
-from iiif_api_services.serializers.AnnotationSerializer import *
-from iiif_api_services.models import *
-from rest_framework_mongoengine import viewsets
+import json
+from datetime import datetime
+from django.conf import settings # import the settings file to get IIIF_BASE_URL
+from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from iiif_api_services.serializers.AnnotationSerializer import *
+from iiif_api_services.models.QueueModel import Queue
+from iiif_api_services.models.ActivityModel import Activity
+from iiif_api_services.views.BackgroundProcessing import viewAnnotation, createAnnotation, updateAnnotation, destroyAnnotation
+if settings.QUEUE_RUNNER=="PROCESS":
+    from multiprocessing import Process as Runner
+elif settings.QUEUE_RUNNER=="THREAD":
+    from threading import Thread as Runner
 
 
-class AnnotationViewSet(viewsets.ModelViewSet):
-    '''
-    API endpoint that allows Annotation to be created, viewed, edited or deleted
-    '''
-    serializer_class = AnnotationSerializer
-    queryset = Annotation.objects.all()
-    pagination_class = None
+def initializeNewBulkActions():
+    return {"Collection": [], "Manifest": [], "Sequence": [], "Range": [], "Canvas": [], "Annotation": [], "AnnotationList": [], "Layer": []}
 
 
-    def create(self, request, item=None, format=None):
-        '''
-        Create a Annotation for this item
-        '''
+
+class AnnotationViewSet(ViewSet):
+    # GET /:identifier/annotation
+    def list(self, request, identifier=None, format=None):
         try:
-            name = request.data['label'].replace(" ", "")
-            annotation = Annotation.objects.get(item=item, name=name)
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Annotation name already exist in this item."})
-        except:
-            data = request.data
-            serializer = AnnotationSerializer(data=data, context={'request': request})
-            if serializer.is_valid():
-                name = request.data['label'].replace(" ", "")
-                serializer.save(name=name, item=item)
-                return self.retrieve(request, item=item, name=name, format=format)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-    def list(self, request, item=None, format=None):
-        '''
-        View all Annotations in this item
-        '''
-        try:
-            annotation = Annotation.objects(item=item)
-            if annotation:
-                serializer = EmbeddedAnnotationSerializer(annotation, context={'request': request}, many=True)
-                return Response(serializer.data)
-            else:
-                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such Item exist."})           
-        except Exception as e:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
-
-
-
-    def retrieve(self, request, item=None, name=None, format=None):
-        '''
-        View this Annotation to Update or Delete
-        '''
-        try:
-            annotation = Annotation.objects.get(item=item, name=name)
-            serializer = AnnotationSerializer(annotation, context={'request': request})
-            return Response(serializer.data)
-        except Annotation.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such Annotation exist in this item."})
-        except:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
-
-
-
-
-    def update(self, request, item=None, name=None, format=None):
-        '''
-        Update this Annotation
-        '''
-        try:
-            annotation = Annotation.objects.get(item=item, name=name)
-            serializer = AnnotationSerializer(annotation, data=request.data, context={'request': request})
-            if serializer.is_valid():
-                old_annotation_name = annotation.name
-                new_annotation_name = request.data['label'].replace(" ", "")
-                if old_annotation_name != new_annotation_name:
-                    try:
-                        Annotation.objects.get(item=item, name=new_annotation_name)
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "Cannot create a duplicate Annotation within the same Item."})
-                    except:
-                        pass
-                serializer.save(name=new_annotation_name, item=item)
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Annotation.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-    def destroy(self, request, item=None, name=None, format=None):
-        '''
-        Delete this Annotation
-        '''
-        try:
-            annotation = Annotation.objects.get(item=item, name=name)
-            annotation.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': "Sucessfully deleted this Annotation within the Item."})
-        except Annotation.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-
-class SearchAnnotationViewSet(viewsets.ReadOnlyModelViewSet):
-    '''
-    API endpoint that allows Annotations to be searched
-    '''
-    queryset = Annotation.objects.all()
-    serializer_class = AnnotationSerializer
-    pagination_class = None
-
-    def retrieve(self, request, query=None, format=None):
-        '''
-        Search for Annotations matching the query
-        '''
-        try:
-            fields = query.split("&")
-            query = {}
-            for field in fields:
-                q = field.split("=")
-                query[q[0].strip()+'__icontains'] = q[1].strip()
-            annotations = Annotation.objects(**query)
+            annotations = Annotation.objects(identifier=identifier)
             if annotations:
-                serializer = EmbeddedAnnotationSerializer(annotations, context={'request': request}, many=True)
-                return Response(serializer.data)
-            raise Annotation.DoesNotExist
-        except Annotation.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No Annotations found matching the query."})
-        except IndexError:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "The search query format is invalid."})
-        except Exception as e:
+                annotationsSerializer = AnnotationEmbeddedSerializer(annotations, context={'request': request}, many=True)
+                return Response(annotationsSerializer.data)
+            else:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "Item with name '" + identifier + "' does not exist."})           
+        except Exception as e: # pragma: no cover
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
+
+
+    # GET /:identifier/annotation/:name
+    def retrieve(self, request, identifier=None, name=None, format=None):
+        try:
+            annotation = Annotation.objects.get(identifier=identifier, name=name)
+            return Response(viewAnnotation(annotation))
+        except Annotation.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "Annotation with name '" + name + "' does not exist in identifier '" + identifier + "'."}) 
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message})
+
+
+    def createBackground(self, request, identifier=None, format=None):
+        try:
+            requestBody = json.loads(request.body)["annotation"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_POST_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=createAnnotation, args=(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    createAnnotation.delay(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = createAnnotation(user, identifier, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+
+
+    def updateBackground(self, request, identifier=None, name=None, format=None):
+        try:
+            requestBody = json.loads(request.body)["annotation"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_PUT_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=updateAnnotation, args=(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    updateAnnotation.delay(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = updateAnnotation(user, identifier, name, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+
+
+    def destroyBackground(self, request, identifier=None, name=None, format=None):
+        try:
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_DELETE_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=destroyAnnotation, args=(user, identifier, name, False, str(queue.id), str(activity.id))).start()
+                else:
+                    destroyAnnotation.delay(user, identifier, name, False, str(queue.id), str(activity.id))
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.save()
+                result = destroyAnnotation(user, identifier, name, False, None, str(activity.id))
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+

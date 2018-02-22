@@ -15,7 +15,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/
 lib64/
 parts/
 sdist/
@@ -84,6 +84,9 @@ celerybeat-schedule
 venv/
 ENV/
 
+# Visual Studio Code
+.vscode/
+
 # Spyder project settings
 .spyderproject
 
@@ -108,3 +111,8 @@ tests/report/
 db.sqlite3
 settings.py.orig
 *.pyc
+local_settings.py
+
+# Tests reports
+cover
+testsXMLResults.xml

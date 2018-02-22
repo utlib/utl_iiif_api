@@ -1,0 +1,116 @@
+{
+  "@context": "http://iiif.io/api/presentation/2/context.json",
+  "@id": "http://example.org/iiif/book1/list/p100",
+  "@type": "sc:AnnotationList",
+  "label": "Awesome annotation list",
+  "resources": [
+    {
+      "@id": "https://wellcomelibrary.org/iiif/b28928118/annos/contentAsText/a0t0",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Taka_Shiba.jpg/330px-Taka_Shiba.jpg",
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "SCHOOL HEALTH SERVICE"
+      },
+      "on": "https://wellcomelibrary.org/iiif/b28928118/canvas/c0#xywh=82,870,1592,88"
+    },
+    {
+      "@id": "https://wellcomelibrary.org/iiif/b28928118/annos/contentAsText/a0t1",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Taka_Shiba.jpg/330px-Taka_Shiba.jpg",
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "REPORT"
+      },
+      "on": "https://wellcomelibrary.org/iiif/b28928118/canvas/c0#xywh=514,1342,724,124"
+    },
+    {
+      "@id": "https://wellcomelibrary.org/iiif/b28928118/annos/contentAsText/a0t2",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Taka_Shiba.jpg/330px-Taka_Shiba.jpg",
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "of the"
+      },
+      "on": "https://wellcomelibrary.org/iiif/b28928118/canvas/c0#xywh=827,1572,102,53"
+    },
+    {
+      "@id": "https://wellcomelibrary.org/iiif/b28928118/annos/contentAsText/a0t3",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Taka_Shiba.jpg/330px-Taka_Shiba.jpg",
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "PRINCIPAL SCHOOL MEDICAL OFFICER"
+      },
+      "on": "https://wellcomelibrary.org/iiif/b28928118/canvas/c0#xywh=1,1719,1772,64"
+    },
+    {
+      "@id": "https://wellcomelibrary.org/iiif/b28928118/annos/contentAsText/a0t4",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Taka_Shiba.jpg/330px-Taka_Shiba.jpg",
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "E. LESLIE M. MILLAR, C.B.E., M.D., M.Sc., D.P.H."
+      },
+      "on": "https://wellcomelibrary.org/iiif/b28928118/canvas/c0#xywh=285,1879,1184,46"
+    },
+    {
+      "@id": "https://wellcomelibrary.org/iiif/b28928118/annos/contentAsText/a0t5",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Taka_Shiba.jpg/330px-Taka_Shiba.jpg",
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "Medical Officer of Health and Principal School Medical Officer"
+      },
+      "on": "https://wellcomelibrary.org/iiif/b28928118/canvas/c0#xywh=230,1947,1292,55"
+    },
+    {
+      "@id": "https://wellcomelibrary.org/iiif/b28928118/annos/contentAsText/a0t6",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Taka_Shiba.jpg/330px-Taka_Shiba.jpg",
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "MAURICE E. LEMIN, M.B., Ch.B. (To 6/5/69)"
+      },
+      "on": "https://wellcomelibrary.org/iiif/b28928118/canvas/c0#xywh=355,2052,1041,55"
+    },
+    {
+      "@id": "https://wellcomelibrary.org/iiif/b28928118/annos/contentAsText/a0t7",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Taka_Shiba.jpg/330px-Taka_Shiba.jpg",
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "NATALIE M. JOHNSTON, L.R.C.P., L.R.C.S., D.P.H. (From 7/5/69)"
+      },
+      "on": "https://wellcomelibrary.org/iiif/b28928118/canvas/c0#xywh=113,2157,1529,54"
+    },
+    {
+      "@id": "https://wellcomelibrary.org/iiif/b28928118/annos/contentAsText/a0t8",
+      "@type": "oa:Annotation",
+      "motivation": "sc:painting",
+      "resource": {
+        "@id": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Taka_Shiba.jpg/330px-Taka_Shiba.jpg",
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "Senior Administrative Medical Officer for Personal and Child Health Services"
+      },
+      "on": "https://wellcomelibrary.org/iiif/b28928118/canvas/c0#xywh=74,2228,1609,42"
+    }
+  ]
+}

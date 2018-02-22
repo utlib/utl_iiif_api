@@ -1,144 +1,118 @@
-from iiif_api_services.serializers.CanvasSerializer import *
-from iiif_api_services.models import *
-from rest_framework_mongoengine import viewsets
+import json
+from datetime import datetime
+from django.conf import settings # import the settings file to get IIIF_BASE_URL
+from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from iiif_api_services.serializers.CanvasSerializer import *
+from iiif_api_services.serializers.AnnotationSerializer import *
+from iiif_api_services.serializers.AnnotationListSerializer import *
+from iiif_api_services.views.AnnotationView import AnnotationViewSet
+from iiif_api_services.views.AnnotationListView import AnnotationListViewSet
+from iiif_api_services.models.QueueModel import Queue
+from iiif_api_services.models.ActivityModel import Activity
+from iiif_api_services.views.BackgroundProcessing import viewCanvas, createCanvas, updateCanvas, destroyCanvas
+if settings.QUEUE_RUNNER=="PROCESS":
+    from multiprocessing import Process as Runner
+elif settings.QUEUE_RUNNER=="THREAD":
+    from threading import Thread as Runner
 
 
-class CanvasViewSet(viewsets.ModelViewSet):
-    '''
-    API endpoint that allows Canvas to be created, viewed, edited or deleted
-    '''
-    serializer_class = CanvasSerializer
-    queryset = Canvas.objects.all()
-    pagination_class = None
+def initializeNewBulkActions():
+    return {"Collection": [], "Manifest": [], "Sequence": [], "Range": [], "Canvas": [], "Annotation": [], "AnnotationList": [], "Layer": []}
 
 
-    def create(self, request, item=None, format=None):
-        '''
-        Create a Canvas for this item. \n
-        #### Error Codes
-        * `200` **Success** The Canvas was successfully created. \n
-        * `400` **Client Error** The data sent has validation errors. \n
-        * `500` **Server Error** Internal Server Error.
-        '''
+
+class CanvasViewSet(ViewSet):
+    # GET /:identifier/canvas
+    def list(self, request, identifier=None, format=None):
         try:
-            name = request.data['label'].replace(" ", "")
-            canvas = Canvas.objects.get(item=item, name=name)
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "Canvas name already exist in this item."})
-        except Canvas.DoesNotExist:
-            data = request.data
-            serializer = CanvasSerializer(data=data, context={'request': request})
-            if serializer.is_valid():
-                name = request.data['label'].replace(" ", "")
-                serializer.save(name=name, item=item)
-                return self.retrieve(request, item=item, name=name, format=format)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': "Internal Server Error."})
-
-
-
-    def list(self, request, item=None, format=None):
-        '''
-        View all Canvass in this item
-        '''
-        try:
-            canvas = Canvas.objects(item=item)
+            canvas = Canvas.objects(identifier=identifier)
             if canvas:
-                serializer = EmbeddedCanvasSerializer(canvas, context={'request': request}, many=True)
-                return Response(serializer.data)
+                canvasSerializer = CanvasEmbeddedSerializer(canvas, context={'request': request}, many=True)
+                return Response(canvasSerializer.data)
             else:
-                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such Item exist."})           
-        except Exception as e:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "Item with name '" + identifier + "' does not exist."})           
+        except Exception as e: # pragma: no cover
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
 
 
-
-    def retrieve(self, request, item=None, name=None, format=None):
-        '''
-        View this Canvas to Update or Delete
-        '''
+    # GET /:identifier/canvas/:name
+    def retrieve(self, request, identifier=None, name=None, format=None):
         try:
-            canvas = Canvas.objects.get(item=item, name=name)
-            serializer = CanvasSerializer(canvas, context={'request': request})
-            return Response(serializer.data)
+            canvas = Canvas.objects.get(identifier=identifier, name=name)
+            return Response(viewCanvas(canvas))
         except Canvas.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such Canvas exist in this item."})
-        except:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "Canvas with name '" + name + "' does not exist in identifier '" + identifier + "'."}) 
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message})
 
 
-
-
-    def update(self, request, item=None, name=None, format=None):
-        '''
-        Update this Canvas
-        '''
+    def createBackground(self, request, identifier=None, format=None):
         try:
-            canvas = Canvas.objects.get(item=item, name=name)
-            serializer = CanvasSerializer(canvas, data=request.data, context={'request': request})
-            if serializer.is_valid():
-                old_canvas_name = canvas.name
-                new_canvas_name = request.data['label'].replace(" ", "")
-                if old_canvas_name != new_canvas_name:
-                    try:
-                        Canvas.objects.get(item=item, name=new_canvas_name)
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "Cannot create a duplicate Canvas within the same Item."})
-                    except:
-                        pass
-                serializer.save(name=new_canvas_name, item=item)
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Canvas.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            requestBody = json.loads(request.body)["canvas"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_POST_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=createCanvas, args=(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    createCanvas.delay(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = createCanvas(user, identifier, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
 
 
-
-
-    def destroy(self, request, item=None, name=None, format=None):
-        '''
-        Delete this Canvas
-        '''
+    def updateBackground(self, request, identifier=None, name=None, format=None):
         try:
-            canvas = Canvas.objects.get(item=item, name=name)
-            canvas.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': "Successfully deleted this Canvas within the Item."})
-        except Canvas.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            requestBody = json.loads(request.body)["canvas"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_PUT_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=updateCanvas, args=(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    updateCanvas.delay(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = updateCanvas(user, identifier, name, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
 
 
-
-class SearchCanvasViewSet(viewsets.ReadOnlyModelViewSet):
-    '''
-    API endpoint that allows Canvass to be searched
-    '''
-    queryset = Canvas.objects.all()
-    serializer_class = CanvasSerializer
-    pagination_class = None
-
-    def retrieve(self, request, query=None, format=None):
-        '''
-        Search for Canvass matching the query
-        '''
+    def destroyBackground(self, request, identifier=None, name=None, format=None):
         try:
-            fields = query.split("&")
-            query = {}
-            for field in fields:
-                q = field.split("=")
-                query[q[0].strip()+'__icontains'] = q[1].strip()
-            canvases = Canvas.objects(**query)
-            if canvases:
-                serializer = EmbeddedCanvasSerializer(canvases, context={'request': request}, many=True)
-                return Response(serializer.data)
-            raise Canvas.DoesNotExist
-        except Canvas.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No Canvass found matching the query."})
-        except IndexError:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "The search query format is invalid."})
-        except Exception as e:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_DELETE_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=destroyCanvas, args=(user, identifier, name, False, str(queue.id), str(activity.id))).start()
+                else:
+                    destroyCanvas.delay(user, identifier, name, False, str(queue.id), str(activity.id))
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.save()
+                result = destroyCanvas(user, identifier, name, False, None, str(activity.id))
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+

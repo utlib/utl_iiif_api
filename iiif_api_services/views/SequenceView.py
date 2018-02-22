@@ -1,138 +1,115 @@
-from iiif_api_services.serializers.SequenceSerializer import *
-from iiif_api_services.models import *
-from rest_framework_mongoengine import viewsets
+import json
+from datetime import datetime
+from django.conf import settings # import the settings file to get IIIF_BASE_URL
+from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from iiif_api_services.serializers.SequenceSerializer import *
+from iiif_api_services.serializers.CanvasSerializer import *
+from iiif_api_services.views.CanvasView import CanvasViewSet
+from iiif_api_services.models.QueueModel import Queue
+from iiif_api_services.models.ActivityModel import Activity
+from iiif_api_services.views.BackgroundProcessing import viewSequence, createSequence, updateSequence, destroySequence
+if settings.QUEUE_RUNNER=="PROCESS":
+    from multiprocessing import Process as Runner
+elif settings.QUEUE_RUNNER=="THREAD":
+    from threading import Thread as Runner
 
 
-class SequenceViewSet(viewsets.ModelViewSet):
-    '''
-    API endpoint that allows Sequences to be created, viewed, edited or deleted
-    '''
-    serializer_class = SequenceSerializer
-    queryset = Sequence.objects.all()
-    pagination_class = None
+def initializeNewBulkActions():
+    return {"Collection": [], "Manifest": [], "Sequence": [], "Range": [], "Canvas": [], "Annotation": [], "AnnotationList": [], "Layer": []}
 
 
-    def create(self, request, item=None, format=None):
-        '''
-        Create a Sequence for this item
-        '''
+class SequenceViewSet(ViewSet):
+    # GET /:identifier/sequence
+    def list(self, request, identifier=None, format=None):
         try:
-            name = request.data['label'].replace(" ", "")
-            sequence = Sequence.objects.get(item=item, name=name)
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Sequence name already exist in this item."})
-        except:
-            data = request.data
-            serializer = SequenceSerializer(data=data, context={'request': request})
-            if serializer.is_valid():
-                name = request.data['label'].replace(" ", "")
-                serializer.save(name=name, item=item)
-                return self.retrieve(request, item=item, name=name, format=format)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-    def list(self, request, item=None, format=None):
-        '''
-        View all Sequences in this item
-        '''
-        try:
-            sequence = Sequence.objects(item=item)
-            if sequence:
-                serializer = EmbeddedSequenceSerializer(sequence, context={'request': request}, many=True)
-                return Response(serializer.data)
-            else:
-                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such Item exist."})           
-        except Exception as e:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
-
-
-
-    def retrieve(self, request, item=None, name=None, format=None):
-        '''
-        View this Sequence to Update or Delete
-        '''
-        try:
-            sequence = Sequence.objects.get(item=item, name=name)
-            serializer = SequenceSerializer(sequence, context={'request': request})
-            return Response(serializer.data)
-        except Sequence.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No such Sequence exist in this item."})
-        except:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
-
-
-
-
-    def update(self, request, item=None, name=None, format=None):
-        '''
-        Update this Sequence
-        '''
-        try:
-            sequence = Sequence.objects.get(item=item, name=name)
-            serializer = SequenceSerializer(sequence, data=request.data, context={'request': request})
-            if serializer.is_valid():
-                old_sequence_name = sequence.name
-                new_sequence_name = request.data['label'].replace(" ", "")
-                if old_sequence_name != new_sequence_name:
-                    try:
-                        Sequence.objects.get(item=item, name=new_sequence_name)
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "Cannot create a duplicate Sequence within the same Item."})
-                    except:
-                        pass
-                serializer.save(name=new_sequence_name, item=item)
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Sequence.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error', e.message})
-
-
-
-
-    def destroy(self, request, item=None, name=None, format=None):
-        '''
-        Delete this Sequence
-        '''
-        try:
-            sequence = Sequence.objects.get(item=item, name=name)
-            sequence.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': "Sucessfully deleted this Sequence within the Item."})
-        except Sequence.DoesNotExist:
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED, data={'error': "Item does not exist"})
-        except:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-
-class SearchSequenceViewSet(viewsets.ReadOnlyModelViewSet):
-    '''
-    API endpoint that allows Sequences to be searched
-    '''
-    queryset = Sequence.objects.all()
-    serializer_class = SequenceSerializer
-    pagination_class = None
-
-    def retrieve(self, request, query=None, format=None):
-        '''
-        Search for Sequences matching the query
-        '''
-        try:
-            fields = query.split("&")
-            query = {}
-            for field in fields:
-                q = field.split("=")
-                query[q[0].strip()+'__icontains'] = q[1].strip()
-            sequences = Sequence.objects(**query)
+            sequences = Sequence.objects(identifier=identifier)
             if sequences:
-                serializer = EmbeddedSequenceSerializer(sequences, context={'request': request}, many=True)
-                return Response(serializer.data)
-            raise Sequence.DoesNotExist
-        except Sequence.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "No Sequences found matching the query."})
-        except IndexError:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "The search query format is invalid."})
-        except Exception as e:
+                sequencesSerializer = SequenceEmbeddedSerializer(sequences, context={'request': request}, many=True)
+                return Response(sequencesSerializer.data)
+            else:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "Item with name '" + identifier + "' does not exist."})           
+        except Exception as e: # pragma: no cover
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message}) 
+
+
+    # GET /:identifier/sequence/:name
+    def retrieve(self, request, identifier=None, name=None, format=None):
+        try:
+            sequence = Sequence.objects.get(identifier=identifier, name=name)
+            return Response(viewSequence(sequence))
+        except Sequence.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': "Sequence with name '" + name + "' does not exist in identifier '" + identifier + "'."}) 
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'error': e.message})
+
+
+    def createBackground(self, request, identifier=None, format=None):
+        try:
+            requestBody = json.loads(request.body)["sequence"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_POST_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=createSequence, args=(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    createSequence.delay(user, identifier, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = createSequence(user, identifier, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+
+
+    def updateBackground(self, request, identifier=None, name=None, format=None):
+        try:
+            requestBody = json.loads(request.body)["sequence"]
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_PUT_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.requestBody = requestBody
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=updateSequence, args=(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())).start()
+                else:
+                    updateSequence.delay(user, identifier, name, requestBody, False, str(queue.id), str(activity.id), initializeNewBulkActions())
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.requestBody = requestBody
+                activity.save()
+                result = updateSequence(user, identifier, name, requestBody, False, None, str(activity.id), initializeNewBulkActions())
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+
+
+    def destroyBackground(self, request, identifier=None, name=None, format=None):
+        try:
+            activity = Activity(username=request.user.username, requestPath=request.get_full_path(), requestMethod=request.method, remoteAddress=request.META['REMOTE_ADDR'], startTime=datetime.now())
+            user = request.user.to_mongo()
+            del user["_id"]
+            if settings.QUEUE_DELETE_ENABLED:
+                queue = Queue(status="Pending", activity=activity.to_mongo()).save()
+                activity.save()
+                if settings.QUEUE_RUNNER != "CELERY":
+                    Runner(target=destroySequence, args=(user, identifier, name, False, str(queue.id), str(activity.id))).start()
+                else:
+                    destroySequence.delay(user, identifier, name, False, str(queue.id), str(activity.id))
+                return Response(status=status.HTTP_202_ACCEPTED, data={'message': "Request Accepted", "status": settings.IIIF_BASE_URL + '/queue/' + str(queue.id)})
+            else:
+                activity.save()
+                result = destroySequence(user, identifier, name, False, None, str(activity.id))
+                return Response(status=result["status"], data={"responseBody": result["data"], "responseCode": result["status"]})
+        except Exception as e: # pragma: no cover
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': e.message}) 
+
