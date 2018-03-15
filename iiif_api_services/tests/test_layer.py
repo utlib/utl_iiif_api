@@ -90,28 +90,19 @@ class Layer_Test_POST(APIMongoTestCase):
         if settings.QUEUE_POST_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
+        print response.data
         self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
         self.assertEqual(response.data["responseBody"]["error"]["ATid"][0], 'This field must be unique.')
 
     def test_a_layer_with_no_id_given_can_be_successfully_created(self):
         data = {"layer": json.loads(open(LAYER_SHORT).read())}
         del data["layer"]["@id"]
-        response = self.client.post("/UofT/layer", data)
+        response = self.client.post("/identifier/layer", data)
         if settings.QUEUE_POST_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
         self.assertEqual(Layer.objects()[0].label, 'Diplomatic Transcription')
-        self.assertTrue("_1" in Layer.objects()[0].ATid)
-
-    def test_a_layer_cannot_be_created_if_id_does_not_match_with_identifier(self):
-        data = {"layer": json.loads(open(LAYER_SHORT).read())}
-        response = self.client.post("/UofT/layer", data)
-        if settings.QUEUE_POST_ENABLED:
-            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
-            response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Layer identifier must match with the identifier in @id.")
 
     def test_a_hidden_child_cannot_be_viewed(self):
         data = {"layer": json.loads(open(LAYER_MEDIUM).read())}
@@ -125,6 +116,25 @@ class Layer_Test_POST(APIMongoTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["otherContent"]), 3)
 
+    def test_a_layer_with_invalid_field_cannot_be_created(self):
+        data = {"layer": json.loads(open(LAYER_MEDIUM).read())}
+        data["layer"]['viewingHint'] = ['invalid']
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]['viewingHint'][0], "Not a valid string.")
+
+    def test_a_layer_with_invalid_sub_member_cannot_be_created(self):
+        data = {"layer": json.loads(open(LAYER_MEDIUM).read())}
+        data["layer"]['otherContent'][0] = {"viewingHint": ['invalid']}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]['viewingHint'][0], "Not a valid string.")
 
 class Layer_Test_GET(APIMongoTestCase):
     def setUp(self):
@@ -133,12 +143,12 @@ class Layer_Test_GET(APIMongoTestCase):
     def test_a_layer_from_an_item_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get("/nonExistingItem/layer/layer1")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "Layer with name 'layer1' does not exist in identifier 'nonExistingItem'.")
+        self.assertEqual(response.data["error"], "layer with name 'layer1' does not exist in identifier 'nonExistingItem'.")
 
     def test_a_layer_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get(URL+"/nonExistingLayer")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "Layer with name 'nonExistingLayer' does not exist in identifier 'book1'.")
+        self.assertEqual(response.data["error"], "layer with name 'nonExistingLayer' does not exist in identifier 'book1'.")
 
     def test_a_layer_can_be_viewed(self):
         response = self.client.get("/book1/layer/layer1")
@@ -226,16 +236,33 @@ class Layer_Test_PUT(APIMongoTestCase):
         self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
         Layer(label="layer1", identifier="book1", name="layer1", ATid="http://example.org/iiif/book1/layer/layer1", viewingHint="paged").save()
         Layer(label="layer2", identifier="book1", name="layer2", ATid="http://example.org/iiif/book1/layer/layer2").save()
+        data = {"layer": json.loads(open(LAYER_MEDIUM).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
 
     def test_a_layer_can_be_updated_sucessfully(self):
-        data = {"layer": {"label": "new_layer1", "viewingHint": "non-paged"}}
-        response = self.client.put(URL+"/layer1", data)
+        data = {"layer": json.loads(open(LAYER_MEDIUM).read())}
+        data["layer"]["label"] = "new_layer1"
+        data["layer"]["viewingHint"] = "non-paged"
+        response = self.client.put(URL+"/transcription", data)
         if settings.QUEUE_PUT_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
-        self.assertEqual(Layer.objects()[0].label, 'new_layer1')
-        self.assertEqual(Layer.objects()[0].viewingHint, "non-paged")
+        self.assertEqual(Layer.objects()[2].label, 'new_layer1')
+        self.assertEqual(Layer.objects()[2].viewingHint, "non-paged")
+
+    def test_a_layer_with_invalid_field_cannot_be_updated(self):
+        data = {"layer": json.loads(open(LAYER_MEDIUM).read())}
+        data["layer"]['viewingHint'] = ['invalid']
+        response = self.client.put(URL+"/transcription", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]['viewingHint'][0], "Not a valid string.")
 
     def test_a_layer_that_does_not_exist_cannot_be_updated(self):
         data = {"layer": {"label": "new_layer1", "viewingHint": "non-paged"}}
@@ -246,12 +273,22 @@ class Layer_Test_PUT(APIMongoTestCase):
         self.assertEqual(response.data["responseCode"], status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data["responseBody"]["error"], "Layer with name 'nonExistingLayer' does not exist in identifier 'book1'.")
 
+    def test_a_layer_with_invalid_sub_member_cannot_be_updated(self):
+        data = {"layer": json.loads(open(LAYER_MEDIUM).read())}
+        data["layer"]['otherContent'][0] = {"viewingHint": ['invalid']}
+        response = self.client.put(URL+"/transcription", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]['viewingHint'][0], "Not a valid string.")
+
     def test_a_layer_with_new_id_can_be_updated_successfully(self):
         data = {"layer": {"@id": "http://example.org/iiif/new_book1/layer/new_layer1", "viewingHint": "non-paged"}}
-        response = self.client.put(URL+"/layer1", data)
+        response = self.client.put(URL+"/transcription", data)
         if settings.QUEUE_PUT_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
-        self.assertEqual(Layer.objects()[0].ATid, settings.IIIF_BASE_URL + "/new_book1/layer/new_layer1")
+        self.assertEqual(Layer.objects()[2].ATid, settings.IIIF_BASE_URL + "/new_book1/layer/new_layer1")
 

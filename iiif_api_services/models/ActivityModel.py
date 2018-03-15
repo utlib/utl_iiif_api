@@ -1,3 +1,4 @@
+from datetime import datetime
 from mongoengine import Document, fields
 from iiif_api_services.models.User import User
 
@@ -5,7 +6,8 @@ from iiif_api_services.models.User import User
 class Activity(Document):
     username = fields.StringField(
         null=True,
-        help_text=("The authenticated username who made the request or AnonymousUser.")
+        help_text=(
+            "The authenticated username who made the request or AnonymousUser.")
     )
 
     requestPath = fields.StringField(
@@ -40,6 +42,7 @@ class Activity(Document):
 
     startTime = fields.DateTimeField(
         null=True,
+        default=datetime.now(),
         help_text=("Timestamp of request.")
     )
 

@@ -1,5 +1,4 @@
 [run]
-concurrency = multiprocessing
 omit =
   iiif_api_services/models/User.py
 [report]

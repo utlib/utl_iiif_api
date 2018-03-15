@@ -105,21 +105,12 @@ class Canvas_Test_POST(APIMongoTestCase):
     def test_a_canvas_with_no_id_given_can_be_successfully_created(self):
         data = {"canvas": json.loads(open(CANVAS_SHORT).read())}
         del data["canvas"]["@id"]
-        response = self.client.post("/UofT/canvas", data)
+        response = self.client.post("/identifier/canvas", data)
         if settings.QUEUE_POST_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
         self.assertEqual(Canvas.objects()[0].label, 'p. 1')
-
-    def test_a_canvas_cannot_be_created_if_id_does_not_match_with_identifier(self):
-        data = {"canvas": json.loads(open(CANVAS_SHORT).read())}
-        response = self.client.post("/UofT/canvas", data)
-        if settings.QUEUE_POST_ENABLED:
-            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
-            response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Canvas identifier must match with the identifier in @id.")
 
     def test_a_hidden_child_cannot_be_viewed(self):
         data = {"canvas": json.loads(open(CANVAS_MEDIUM).read())}
@@ -141,12 +132,12 @@ class Canvas_Test_GET(APIMongoTestCase):
     def test_a_canvas_from_an_item_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get("/nonExistingItem/canvas/canvas1")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "Canvas with name 'canvas1' does not exist in identifier 'nonExistingItem'.")
+        self.assertEqual(response.data["error"], "canvas with name 'canvas1' does not exist in identifier 'nonExistingItem'.")
 
     def test_a_canvas_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get(URL+"/nonExistingCanvas")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "Canvas with name 'nonExistingCanvas' does not exist in identifier 'book1'.")
+        self.assertEqual(response.data["error"], "canvas with name 'nonExistingCanvas' does not exist in identifier 'book1'.")
 
     def test_a_canvas_can_be_viewed(self):
         response = self.client.get("/book1/canvas/canvas1")
@@ -234,16 +225,53 @@ class Canvas_Test_PUT(APIMongoTestCase):
         self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
         Canvas(label="canvas1", identifier="book1", name="canvas1", ATid="http://example.org/iiif/book1/canvas/canvas1", viewingHint="paged").save()
         Canvas(label="canvas2", identifier="book1", name="canvas2", ATid="http://example.org/iiif/book1/canvas/canvas2").save()
+        data = {"canvas": json.loads(open(CANVAS_FULL).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
 
     def test_a_canvas_can_be_updated_sucessfully(self):
-        data = {"canvas": {"label": "new_canvas1", "viewingHint": "non-paged"}}
-        response = self.client.put(URL+"/canvas1", data)
+        data = {"canvas": json.loads(open(CANVAS_FULL).read())}
+        data["canvas"]["label"] = "new_canvas1"
+        data["canvas"]["viewingHint"] = "non-paged"
+        response = self.client.put(URL+"/c0", data)
         if settings.QUEUE_PUT_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
-        self.assertEqual(Canvas.objects()[0].label, 'new_canvas1')
-        self.assertEqual(Canvas.objects()[0].viewingHint, 'non-paged')
+        self.assertEqual(Canvas.objects()[2].label, 'new_canvas1')
+        self.assertEqual(Canvas.objects()[2].viewingHint, 'non-paged')
+
+    def test_a_canvas_with_validation_error_cannot_be_updated_sucessfully(self):
+        data = {"canvas": json.loads(open(CANVAS_FULL).read())}
+        data["canvas"]["viewingHint"] = ["invalid"]
+        response = self.client.put(URL+"/c0", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]["viewingHint"][0], "Not a valid string.")
+
+    def test_a_canvas_with_validation_error_in_sub_annotation_cannot_be_updated_sucessfully(self):
+        data = {"canvas": json.loads(open(CANVAS_FULL).read())}
+        data["canvas"]['images'][0]["viewingHint"] = ["invalid"]
+        response = self.client.put(URL+"/c0", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]["viewingHint"][0], "Not a valid string.")
+
+    def test_a_canvas_with_validation_error_in_sub_annotation_list_cannot_be_updated_sucessfully(self):
+        data = {"canvas": json.loads(open(CANVAS_FULL).read())}
+        data["canvas"]['otherContent'][0]["viewingHint"] = ["invalid"]
+        response = self.client.put(URL+"/c0", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]["viewingHint"][0], "Not a valid string.")
 
     def test_a_canvas_that_does_not_exist_cannot_be_updated(self):
         data = {"canvas": {"label": "new_canvas1", "viewingHint": "non-paged"}}
@@ -256,10 +284,10 @@ class Canvas_Test_PUT(APIMongoTestCase):
 
     def test_a_canvas_with_new_id_can_be_updated_successfully(self):
         data = {"canvas": {"@id": "http://example.org/iiif/new_book1/canvas/new_canvas1", "viewingHint": "non-paged"}}
-        response = self.client.put(URL+"/canvas1", data)
+        response = self.client.put(URL+"/c0", data)
         if settings.QUEUE_PUT_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
-        self.assertEqual(Canvas.objects()[0].ATid, settings.IIIF_BASE_URL + "/new_book1/canvas/new_canvas1")
+        self.assertEqual(Canvas.objects()[2].ATid, settings.IIIF_BASE_URL + "/new_book1/canvas/new_canvas1")
 

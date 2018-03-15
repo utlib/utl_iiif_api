@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from rest_framework_mongoengine.serializers import DocumentSerializer
 from iiif_api_services.models.LayerModel import Layer
+from rest_framework_mongoengine.serializers import DocumentSerializer
 
 
 class LayerSerializer(DocumentSerializer):
@@ -15,7 +15,8 @@ class LayerViewSerializer(DocumentSerializer):
 
     class Meta:
         model = Layer
-        exclude = ('id', 'identifier', 'name', 'order', 'embeddedEntirely', 'belongsTo', 'hidden', 'ownedBy', 'children', )
+        exclude = ('id', 'identifier', 'name', 'order', 'embeddedEntirely',
+                   'belongsTo', 'hidden', 'ownedBy', 'children', )
 
 
 class LayerEmbeddedSerializer(DocumentSerializer):

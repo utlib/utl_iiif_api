@@ -148,7 +148,8 @@
       "label": "Cover",
       "canvases": [
         "https://wellcomelibrary.org/iiif/book1/canvas/c79"
-      ]
+      ],
+      "contentLayer": "http://example.org/iiif/book1/layer/introTexts"
     }
   ]
 }

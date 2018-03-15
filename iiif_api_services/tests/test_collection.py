@@ -7,6 +7,8 @@ from django.conf import settings  # import the settings file to get IIIF_BASE_UR
 from iiif_api_services.models.User import User
 from iiif_api_services.models.CollectionModel import Collection
 from iiif_api_services.models.ManifestModel import Manifest
+from django.test import override_settings
+
 
 COLLECTION_MEDIUM = os.path.join(os.path.dirname(__file__), 'testData', 'collection', 'collectionMedium.json')
 COLLECTION_SHORT = os.path.join(os.path.dirname(__file__), 'testData', 'collection', 'collectionShort.json')
@@ -38,8 +40,8 @@ class Collection_Test_Without_Authentication(APIMongoTestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-
-class Collection_Test_POST(APIMongoTestCase):
+@override_settings()
+class Collection_Test_POST_Without_QUEUE(APIMongoTestCase):
     def setUp(self):
         self.user = User.create_user('staff', 'staff@mail.com', 'staffpass')
         jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
@@ -47,6 +49,9 @@ class Collection_Test_POST(APIMongoTestCase):
         payload = jwt_payload_handler(self.user)
         token = jwt_encode_handler(payload)
         self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        settings.QUEUE_POST_ENABLED = False
+        settings.QUEUE_PUT_ENABLED = False
+        settings.QUEUE_DELETE_ENABLED = False
 
     def test_a_collection_can_be_successfully_created_with_no_nested_structures(self):
         data = {"collection": json.loads(open(COLLECTION_SHORT).read())}
@@ -96,14 +101,14 @@ class Collection_Test_POST(APIMongoTestCase):
         self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
         self.assertEqual(Collection.objects()[0].label, 'some collection label parent')
 
-    def test_a_collection_cannot_be_created_with_id_being_uoft(self):
-        data = {"collection": {"@id": settings.IIIF_BASE_URL + "/collections/UofT"}}
+    def test_a_collection_cannot_be_created_with_id_being_top_level_collection_name(self):
+        data = {"collection": {"@id": settings.IIIF_BASE_URL + "/collections/"+settings.TOP_LEVEL_COLLECTION_NAME}}
         response = self.client.post("/collections", data)
         if settings.QUEUE_POST_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Collection name cannot be: UofT.")
+        self.assertEqual(response.data["responseBody"]["error"], "Collection name cannot be: "+settings.TOP_LEVEL_COLLECTION_NAME+".")
 
     def test_a_hidden_child_cannot_be_viewed(self):
         data = {"collection": json.loads(open(COLLECTION_MEDIUM).read())}
@@ -235,6 +240,82 @@ class Collection_Test_POST(APIMongoTestCase):
         self.assertEqual(Manifest.objects.get(identifier="book3").ownedBy, ["testStaff"]) 
 
 
+@override_settings()
+class Collection_Test_POST_With_THREAD_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('staff', 'staff@mail.com', 'staffpass')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'THREAD'
+
+    def test_a_collection_can_be_successfully_created_with_no_nested_structures(self):
+        data = {"collection": json.loads(open(COLLECTION_SHORT).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(Collection.objects()[0].label, 'some collection label parent')
+        self.assertEqual(Collection.objects()[0].ATid, settings.IIIF_BASE_URL + "/collections/book1")
+
+
+@override_settings()
+class Collection_Test_POST_With_PROCESS_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('staff', 'staff@mail.com', 'staffpass')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'PROCESS'
+
+    def test_a_collection_can_be_successfully_created_with_no_nested_structures(self):
+        data = {"collection": json.loads(open(COLLECTION_SHORT).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(Collection.objects()[0].label, 'some collection label parent')
+        self.assertEqual(Collection.objects()[0].ATid, settings.IIIF_BASE_URL + "/collections/book1")
+
+
+@override_settings()
+class Collection_Test_POST_With_CELERY_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('staff', 'staff@mail.com', 'staffpass')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'CELERY'
+
+    def test_a_collection_can_be_successfully_created_with_no_nested_structures(self):
+        data = {"collection": json.loads(open(COLLECTION_SHORT).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(Collection.objects()[0].label, 'some collection label parent')
+        self.assertEqual(Collection.objects()[0].ATid, settings.IIIF_BASE_URL + "/collections/book1")
+
+
+
 class Collection_Test_GET(APIMongoTestCase):
     def setUp(self):
         Collection(label="collection1", name="book1", ATid="http://example.org/iiif/collections/book1").save()
@@ -244,22 +325,23 @@ class Collection_Test_GET(APIMongoTestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data["error"], "Collection with name 'nonExistingCollection' does not exist.")
 
-    def test_default_uoft_collection_can_be_viewed(self):
-        response = self.client.get("/collections/UofT")
+    def test_default_top_level_collection_can_be_viewed(self):
+        response = self.client.get("/collections/"+settings.TOP_LEVEL_COLLECTION_NAME)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["ATid"], settings.IIIF_BASE_URL + "/collections/UofT")
+        self.assertEqual(response.data["ATid"], settings.IIIF_BASE_URL + "/collections/"+settings.TOP_LEVEL_COLLECTION_NAME)
 
     def test_default_uoft_collection_can_be_viewed_from_root_endpoint(self):
         response = self.client.get("/collections")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["ATid"], settings.IIIF_BASE_URL + "/collections/UofT")
+        self.assertEqual(response.data["ATid"], settings.IIIF_BASE_URL + "/collections/"+settings.TOP_LEVEL_COLLECTION_NAME)
 
     def test_a_collection_can_be_viewed(self):
         response = self.client.get("/collections/book1")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
-class Collection_Test_DELETE(APIMongoTestCase):
+@override_settings()
+class Collection_Test_DELETE_Without_QUEUE(APIMongoTestCase):
     def setUp(self):
         self.user = User.create_user('testadmin', 'testemail@mail.com', 'testadminpass', True)
         jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
@@ -268,6 +350,9 @@ class Collection_Test_DELETE(APIMongoTestCase):
         token = jwt_encode_handler(payload)
         self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
         Collection(label="collection2", name="book2", ATid="http://example.org/iiif/collections/book2").save()
+        settings.QUEUE_POST_ENABLED = False
+        settings.QUEUE_PUT_ENABLED = False
+        settings.QUEUE_DELETE_ENABLED = False
 
     def test_a_collection_can_be_deleted_sucessfully(self):
         response = self.client.delete("/collections/book2")
@@ -302,7 +387,82 @@ class Collection_Test_DELETE(APIMongoTestCase):
         self.assertEqual(len(Collection.objects), 1)
 
 
-class Collection_Test_PUT(APIMongoTestCase):
+@override_settings()
+class Collection_Test_DELETE_With_THREAD_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('testadmin', 'testemail@mail.com', 'testadminpass', True)
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        Collection(label="collection2", name="book2", ATid="http://example.org/iiif/collections/book2").save()
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'THREAD'
+
+    def test_a_collection_can_be_deleted_sucessfully(self):
+        response = self.client.delete("/collections/book2")
+        if settings.QUEUE_DELETE_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data["responseBody"]['message'], "Successfully deleted Collection 'book2'.")
+
+
+
+@override_settings()
+class Collection_Test_DELETE_With_PROCESS_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('testadmin', 'testemail@mail.com', 'testadminpass', True)
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        Collection(label="collection2", name="book2", ATid="http://example.org/iiif/collections/book2").save()
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'PROCESS'
+
+    def test_a_collection_can_be_deleted_sucessfully(self):
+        response = self.client.delete("/collections/book2")
+        if settings.QUEUE_DELETE_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data["responseBody"]['message'], "Successfully deleted Collection 'book2'.")
+
+
+
+@override_settings()
+class Collection_Test_DELETE_With_CELERY_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('testadmin', 'testemail@mail.com', 'testadminpass', True)
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        Collection(label="collection2", name="book2", ATid="http://example.org/iiif/collections/book2").save()
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'CELERY'
+
+    def test_a_collection_can_be_deleted_sucessfully(self):
+        response = self.client.delete("/collections/book2")
+        if settings.QUEUE_DELETE_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data["responseBody"]['message'], "Successfully deleted Collection 'book2'.")
+
+
+@override_settings()
+class Collection_Test_PUT_Without_QUEUE(APIMongoTestCase):
     def setUp(self):
         self.user = User.create_user('testadmin', 'testemail@mail.com', 'testadminpass', True)
         jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
@@ -312,6 +472,9 @@ class Collection_Test_PUT(APIMongoTestCase):
         self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
         Collection(label="collection1", name="book1", ATid="http://example.org/iiif/collectionsShort/book1", viewingHint="paged").save()
         Collection(label="collection2", name="book2", ATid="http://example.org/iiif/collections/book2").save()
+        settings.QUEUE_POST_ENABLED = False
+        settings.QUEUE_PUT_ENABLED = False
+        settings.QUEUE_DELETE_ENABLED = False
 
     def test_a_collection_can_be_updated_sucessfully(self):
         data = {"collection": {"label": "new_collection1", "viewingHint": "non-paged"}}
@@ -350,14 +513,15 @@ class Collection_Test_PUT(APIMongoTestCase):
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
         self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL + "/collections/new_book1")
 
-    def test_the_top_level_uoft_collection_cannot_be_updated(self):
+    def test_the_top_level_collection_cannot_be_updated(self):
         data = {"collection": {"@id": "http://example.org/iiif/collections/new_book1", "viewingHint": "non-paged"}}
-        response = self.client.put("/collections/UofT", data)
+        response = self.client.put("/collections/"+settings.TOP_LEVEL_COLLECTION_NAME, data)
         if settings.QUEUE_PUT_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
+        print response.data["responseBody"]
         self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Top level UofT Collection cannot be edited.")
+        self.assertEqual(response.data["responseBody"]["error"], "Top level Collection cannot be edited.")
 
     def test_a_collection_with_nested_objects_can_be_updated_successfully(self):
         data = {"collection": json.loads(open(COLLECTION_MEDIUM).read())}
@@ -390,7 +554,6 @@ class Collection_Test_PUT(APIMongoTestCase):
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
         self.assertEqual(len(Manifest.objects), 4)
 
-
     def test_a_collection_with_new_id_will_update_its_nested_objects_belongsTo_field(self):
         data = {"collection": json.loads(open(COLLECTION_MEDIUM).read())}
         data["collection"]["@id"] = "http://example.org/iiif/collections/book3"
@@ -409,6 +572,24 @@ class Collection_Test_PUT(APIMongoTestCase):
         self.assertEqual(Collection.objects.get(name='top6').belongsTo[0], settings.IIIF_BASE_URL + "/collections/not-book3")
         self.assertEqual(Collection.objects.get(name='top98').belongsTo[0], settings.IIIF_BASE_URL + "/collections/not-book3")
         self.assertEqual(Collection.objects.get(name='top6666').belongsTo[0], settings.IIIF_BASE_URL + "/collections/not-book3")
+
+    def test_a_collection_with_new_id_will_update_its_parent_objects_children_field(self):
+        data = {"collection": json.loads(open(COLLECTION_MEDIUM).read())}
+        data["collection"]["@id"] = "http://example.org/iiif/collections/book35"
+        data["collection"]['members'][1]['collections'] = [{"@id": "http://example.org/iiif/collection/book_3_child"}]
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+        self.assertEqual(Collection.objects.get(name='book_3_child').belongsTo[0], settings.IIIF_BASE_URL + "/collections/top6666")
+        self.assertEqual(Collection.objects.get(name='top6666').children[0], settings.IIIF_BASE_URL + "/collections/book_3_child")
+        data = {"collection": {"@id": "http://example.org/iiif/collections/not_book3_child"}}
+        response = self.client.put(URL+"/book_3_child", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
+        self.assertEqual(Collection.objects.get(name='not_book3_child').belongsTo[0], settings.IIIF_BASE_URL + "/collections/top6666")
+        self.assertEqual(Collection.objects.get(name='top6666').children[0], settings.IIIF_BASE_URL + "/collections/not_book3_child")
 
     def test_a_collection_cannot_be_updated_with_errors_in_nested_collections(self):
         data = {"collection": json.loads(open(COLLECTION_MEDIUM).read())}
@@ -536,3 +717,86 @@ class Collection_Test_PUT(APIMongoTestCase):
         self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
         self.assertTrue(settings.IIIF_BASE_URL + "/collections/book3" in Manifest.objects.get(identifier='book1').belongsTo)
         self.assertTrue(settings.IIIF_BASE_URL +"/collections/book156" in Manifest.objects.get(identifier='book1').belongsTo)
+
+
+@override_settings()
+class Collection_Test_PUT_With_THREAD_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('testadmin', 'testemail@mail.com', 'testadminpass', True)
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        Collection(label="collection1", name="book1", ATid="http://example.org/iiif/collectionsShort/book1", viewingHint="paged").save()
+        Collection(label="collection2", name="book2", ATid="http://example.org/iiif/collections/book2").save()
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'THREAD'
+
+    def test_a_collection_can_be_updated_sucessfully(self):
+        data = {"collection": {"label": "new_collection1", "viewingHint": "non-paged"}}
+        response = self.client.put("/collections/book1", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
+        self.assertEqual(Collection.objects()[0].label, 'new_collection1')
+        self.assertEqual(Collection.objects()[0].viewingHint, 'non-paged')
+
+
+
+@override_settings()
+class Collection_Test_PUT_With_PROCESS_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('testadmin', 'testemail@mail.com', 'testadminpass', True)
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        Collection(label="collection1", name="book1", ATid="http://example.org/iiif/collectionsShort/book1", viewingHint="paged").save()
+        Collection(label="collection2", name="book2", ATid="http://example.org/iiif/collections/book2").save()
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'PROCESS'
+
+    def test_a_collection_can_be_updated_sucessfully(self):
+        data = {"collection": {"label": "new_collection1", "viewingHint": "non-paged"}}
+        response = self.client.put("/collections/book1", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
+        self.assertEqual(Collection.objects()[0].label, 'new_collection1')
+        self.assertEqual(Collection.objects()[0].viewingHint, 'non-paged')
+
+
+
+@override_settings()
+class Collection_Test_PUT_With_CELERY_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('testadmin', 'testemail@mail.com', 'testadminpass', True)
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        Collection(label="collection1", name="book1", ATid="http://example.org/iiif/collectionsShort/book1", viewingHint="paged").save()
+        Collection(label="collection2", name="book2", ATid="http://example.org/iiif/collections/book2").save()
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'CELERY'
+
+    def test_a_collection_can_be_updated_sucessfully(self):
+        data = {"collection": {"label": "new_collection1", "viewingHint": "non-paged"}}
+        response = self.client.put("/collections/book1", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
+        self.assertEqual(Collection.objects()[0].label, 'new_collection1')
+        self.assertEqual(Collection.objects()[0].viewingHint, 'non-paged')

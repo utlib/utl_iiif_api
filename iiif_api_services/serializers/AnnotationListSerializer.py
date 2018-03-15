@@ -15,7 +15,8 @@ class AnnotationListViewSerializer(DocumentSerializer):
 
     class Meta:
         model = AnnotationList
-        exclude = ('id', 'identifier', 'name', 'order', 'embeddedEntirely', 'belongsTo', 'hidden', 'ownedBy', 'children', )
+        exclude = ('id', 'identifier', 'name', 'order', 'embeddedEntirely',
+                   'belongsTo', 'hidden', 'ownedBy', 'children', )
 
 
 class AnnotationListEmbeddedSerializer(DocumentSerializer):

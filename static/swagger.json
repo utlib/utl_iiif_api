@@ -410,7 +410,7 @@
                                     {
                                         "@id":"http://localhost:8000/collections/to-p",
                                         "@type":"sc:Collection",
-                                        "label":"some colelction label parent"
+                                        "label":"some collection label parent"
                                     },
                                     {
                                         "@id":"http://localhost:8000/b28928118/manifest",
@@ -502,12 +502,12 @@
                                 "@context":"http://iiif.io/api/presentation/2/context.json",
                                 "@id":"http://localhost:8000/collections/to-p",
                                 "@type":"sc:Collection",
-                                "label":"some colelction label parent",
+                                "label":"some collection label parent",
                                 "members":[
                                     {
                                         "@id":"http://localhost:8000/collections/top6",
                                         "@type":"sc:Collection",
-                                        "label":"some colelction label child"
+                                        "label":"some collection label child"
                                     },
                                     {
                                         "@id":"http://localhost:8000/collections/top6666",
@@ -517,7 +517,7 @@
                                     {
                                         "@id":"http://localhost:8000/collections/top98",
                                         "@type":"sc:Collection",
-                                        "label":"anothoer colelction label child"
+                                        "label":"Another collection label child"
                                     },
                                     {
                                         "@id":"http://localhost:8000/book1/manifest",
@@ -1382,7 +1382,7 @@
         "/{identifier}/canvas":{
             "get":{
                 "description":"",
-                "summary":"View all Canvases of an Item",
+                "summary":"View all Canvass of an Item",
                 "tags":[
                     "Canvas"
                 ],
@@ -1405,7 +1405,7 @@
                         "schema":{
                             "type":"array",
                             "items":{
-                                "$ref":"#/definitions/ViewAllCanvasesresponse"
+                                "$ref":"#/definitions/ViewAllCanvassresponse"
                             }
                         },
                         "examples":{
@@ -2565,12 +2565,12 @@
                                 {
                                     "@id":"http://localhost:8000/collections/top6",
                                     "@type":"sc:Collection",
-                                    "label":"some colelction label child"
+                                    "label":"some collection label child"
                                 },
                                 {
                                     "@id":"http://localhost:8000/collections/top98",
                                     "@type":"sc:Collection",
-                                    "label":"anothoer colelction label child"
+                                    "label":"Another collection label child"
                                 },
                                 {
                                     "@id":"http://localhost:8000/collections/top6666",
@@ -2759,7 +2759,7 @@
         "/search/canvas/?{query}":{
             "get":{
                 "description":"",
-                "summary":"Search Canvases",
+                "summary":"Search Canvass",
                 "tags":[
                     "Search"
                 ],
@@ -2781,7 +2781,7 @@
                         "schema":{
                             "type":"array",
                             "items":{
-                                "$ref":"#/definitions/SearchCanvasesresponse"
+                                "$ref":"#/definitions/SearchCanvassresponse"
                             }
                         },
                         "examples":{
@@ -3451,7 +3451,7 @@
                                 "requestMethod":"POST",
                                 "remoteAddress":"127.0.0.1",
                                 "serverHostname":"Latitude",
-                                "requestBody":{
+                                "request_body":{
                                     "annotation":{
                                         "@id":"https://wellcomelibrary.org/iiif/b28928118/imageanno/8d2ad60b-1ca6-4a80-a0b1-b3aca48a62a1",
                                         "@type":"oa:Annotation",
@@ -3873,15 +3873,15 @@
             "example":{
                 "collection":{
                     "@id":"http://example.org/iiif/collections/to-p",
-                    "label":"some colelction label parent",
+                    "label":"some collection label parent",
                     "collections":[
                         {
                             "@id":"http://example.org/iiif/collections/top6",
-                            "label":"some colelction label child"
+                            "label":"some collection label child"
                         },
                         {
                             "@id":"http://example.org/iiif/collections/top98",
-                            "label":"anothoer colelction label child"
+                            "label":"Another collection label child"
                         }
                     ],
                     "manifests":[
@@ -3922,15 +3922,15 @@
             "title":"Collection",
             "example":{
                 "@id":"http://example.org/iiif/collections/to-p",
-                "label":"some colelction label parent",
+                "label":"some collection label parent",
                 "collections":[
                     {
                         "@id":"http://example.org/iiif/collections/top6",
-                        "label":"some colelction label child"
+                        "label":"some collection label child"
                     },
                     {
                         "@id":"http://example.org/iiif/collections/top98",
-                        "label":"anothoer colelction label child"
+                        "label":"Another collection label child"
                     }
                 ],
                 "manifests":[
@@ -3965,7 +3965,7 @@
                 },
                 "label":{
                     "description":"",
-                    "example":"some colelction label parent",
+                    "example":"some collection label parent",
                     "type":"string"
                 },
                 "collections":{
@@ -3973,11 +3973,11 @@
                     "example":[
                         {
                             "@id":"http://example.org/iiif/collections/top6",
-                            "label":"some colelction label child"
+                            "label":"some collection label child"
                         },
                         {
                             "@id":"http://example.org/iiif/collections/top98",
-                            "label":"anothoer colelction label child"
+                            "label":"Another collection label child"
                         }
                     ],
                     "type":"array",
@@ -4034,7 +4034,7 @@
             "title":"Collection6",
             "example":{
                 "@id":"http://example.org/iiif/collections/top6",
-                "label":"some colelction label child"
+                "label":"some collection label child"
             },
             "type":"object",
             "properties":{
@@ -4045,7 +4045,7 @@
                 },
                 "label":{
                     "description":"",
-                    "example":"some colelction label child",
+                    "example":"some collection label child",
                     "type":"string"
                 }
             },
@@ -4115,12 +4115,12 @@
                 "@context":"http://iiif.io/api/presentation/2/context.json",
                 "@id":"http://localhost:8000/collections/to-p",
                 "@type":"sc:Collection",
-                "label":"some colelction label parent",
+                "label":"some collection label parent",
                 "members":[
                     {
                         "@id":"http://localhost:8000/collections/top6",
                         "@type":"sc:Collection",
-                        "label":"some colelction label child"
+                        "label":"some collection label child"
                     },
                     {
                         "@id":"http://localhost:8000/collections/top6666",
@@ -4130,7 +4130,7 @@
                     {
                         "@id":"http://localhost:8000/collections/top98",
                         "@type":"sc:Collection",
-                        "label":"anothoer colelction label child"
+                        "label":"Another collection label child"
                     },
                     {
                         "@id":"http://localhost:8000/book1/manifest",
@@ -4177,7 +4177,7 @@
                 },
                 "label":{
                     "description":"",
-                    "example":"some colelction label parent",
+                    "example":"some collection label parent",
                     "type":"string"
                 },
                 "members":{
@@ -4186,7 +4186,7 @@
                         {
                             "@id":"http://localhost:8000/collections/top6",
                             "@type":"sc:Collection",
-                            "label":"some colelction label child"
+                            "label":"some collection label child"
                         },
                         {
                             "@id":"http://localhost:8000/collections/top6666",
@@ -4196,7 +4196,7 @@
                         {
                             "@id":"http://localhost:8000/collections/top98",
                             "@type":"sc:Collection",
-                            "label":"anothoer colelction label child"
+                            "label":"Another collection label child"
                         },
                         {
                             "@id":"http://localhost:8000/book1/manifest",
@@ -4296,7 +4296,7 @@
                     {
                         "@id":"http://localhost:8000/collections/to-p",
                         "@type":"sc:Collection",
-                        "label":"some colelction label parent"
+                        "label":"some collection label parent"
                     },
                     {
                         "@id":"http://localhost:8000/b28928118/manifest",
@@ -4334,7 +4334,7 @@
                         {
                             "@id":"http://localhost:8000/collections/to-p",
                             "@type":"sc:Collection",
-                            "label":"some colelction label parent"
+                            "label":"some collection label parent"
                         },
                         {
                             "@id":"http://localhost:8000/b28928118/manifest",
@@ -4369,12 +4369,12 @@
                 "@context":"http://iiif.io/api/presentation/2/context.json",
                 "@id":"http://localhost:8000/collections/to-p",
                 "@type":"sc:Collection",
-                "label":"some colelction label parent",
+                "label":"some collection label parent",
                 "members":[
                     {
                         "@id":"http://localhost:8000/collections/top6",
                         "@type":"sc:Collection",
-                        "label":"some colelction label child"
+                        "label":"some collection label child"
                     },
                     {
                         "@id":"http://localhost:8000/collections/top6666",
@@ -4384,7 +4384,7 @@
                     {
                         "@id":"http://localhost:8000/collections/top98",
                         "@type":"sc:Collection",
-                        "label":"anothoer colelction label child"
+                        "label":"Another collection label child"
                     },
                     {
                         "@id":"http://localhost:8000/book1/manifest",
@@ -4431,7 +4431,7 @@
                 },
                 "label":{
                     "description":"",
-                    "example":"some colelction label parent",
+                    "example":"some collection label parent",
                     "type":"string"
                 },
                 "members":{
@@ -4440,7 +4440,7 @@
                         {
                             "@id":"http://localhost:8000/collections/top6",
                             "@type":"sc:Collection",
-                            "label":"some colelction label child"
+                            "label":"some collection label child"
                         },
                         {
                             "@id":"http://localhost:8000/collections/top6666",
@@ -4450,7 +4450,7 @@
                         {
                             "@id":"http://localhost:8000/collections/top98",
                             "@type":"sc:Collection",
-                            "label":"anothoer colelction label child"
+                            "label":"Another collection label child"
                         },
                         {
                             "@id":"http://localhost:8000/book1/manifest",
@@ -5654,7 +5654,7 @@
                     ],
                     "type":"array",
                     "items":{
-                        "$ref":"#/definitions/Canvase"
+                        "$ref":"#/definitions/Canvas"
                     }
                 }
             },
@@ -5668,8 +5668,8 @@
                 "canvases"
             ]
         },
-        "Canvase":{
-            "title":"Canvase",
+        "Canvas":{
+            "title":"Canvas",
             "example":{
                 "@id":"http://example.org/iiif/book1/canvas/p1",
                 "@type":"sc:Canvas",
@@ -5794,7 +5794,7 @@
                     ],
                     "type":"array",
                     "items":{
-                        "$ref":"#/definitions/Canvase"
+                        "$ref":"#/definitions/Canvas"
                     }
                 },
                 "internalUseOnly":{
@@ -5992,7 +5992,7 @@
                     ],
                     "type":"array",
                     "items":{
-                        "$ref":"#/definitions/Canvase"
+                        "$ref":"#/definitions/Canvas"
                     }
                 },
                 "internalUseOnly":{
@@ -6189,7 +6189,7 @@
                     ],
                     "type":"array",
                     "items":{
-                        "$ref":"#/definitions/Canvase"
+                        "$ref":"#/definitions/Canvas"
                     }
                 },
                 "internalUseOnly":{
@@ -7346,8 +7346,8 @@
                 "format"
             ]
         },
-        "ViewAllCanvasesresponse":{
-            "title":"View all CanvasesResponse",
+        "ViewAllCanvassresponse":{
+            "title":"View all CanvassResponse",
             "example":{
                 "@id":"http://localhost:8000/book1/canvas/p1",
                 "@type":"sc:Canvas",
@@ -9230,7 +9230,7 @@
             "example":{
                 "@id":"http://localhost:8000/collections/top6",
                 "@type":"sc:Collection",
-                "label":"some colelction label child"
+                "label":"some collection label child"
             },
             "type":"object",
             "properties":{
@@ -9246,7 +9246,7 @@
                 },
                 "label":{
                     "description":"",
-                    "example":"some colelction label child",
+                    "example":"some collection label child",
                     "type":"string"
                 }
             },
@@ -9349,8 +9349,8 @@
                 "label"
             ]
         },
-        "SearchCanvasesresponse":{
-            "title":"Search CanvasesResponse",
+        "SearchCanvassresponse":{
+            "title":"Search CanvassResponse",
             "example":{
                 "@id":"http://localhost:8000/b28928118/canvas/c0",
                 "@type":"sc:Canvas",
@@ -10360,7 +10360,7 @@
                 "requestMethod":"POST",
                 "remoteAddress":"127.0.0.1",
                 "serverHostname":"Latitude",
-                "requestBody":{
+                "request_body":{
                     "annotation":{
                         "@id":"https://wellcomelibrary.org/iiif/b28928118/imageanno/8d2ad60b-1ca6-4a80-a0b1-b3aca48a62a1",
                         "@type":"oa:Annotation",
@@ -10443,7 +10443,7 @@
                     "example":"Latitude",
                     "type":"string"
                 },
-                "requestBody":{
+                "request_body":{
                     "$ref":"#/definitions/RequestBody"
                 },
                 "responseBody":{
@@ -10473,7 +10473,7 @@
                 "requestMethod",
                 "remoteAddress",
                 "serverHostname",
-                "requestBody",
+                "request_body",
                 "responseBody",
                 "responseCode",
                 "startTime",

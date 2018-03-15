@@ -116,3 +116,7 @@ local_settings.py
 # Tests reports
 cover
 testsXMLResults.xml
+
+# Static analysis
+.scannerwork/
+sonar-project.properties

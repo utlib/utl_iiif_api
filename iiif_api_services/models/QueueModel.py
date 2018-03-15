@@ -3,9 +3,10 @@ from mongoengine import Document, fields
 
 class Queue(Document):
     status = fields.StringField(
-        required=True, 
+        required=True,
         default="Pending",
-        help_text=("The current status of the request. Either Pending or Complete.")
+        help_text=(
+            "The current status of the request. Either Pending or Complete.")
     )
 
     activity = fields.DictField(
@@ -13,4 +14,3 @@ class Queue(Document):
         default={},
         help_text=("The corresponding activity for this Queue")
     )
-

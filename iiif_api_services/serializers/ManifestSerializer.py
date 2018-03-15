@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from rest_framework_mongoengine.serializers import DocumentSerializer
 from iiif_api_services.models.ManifestModel import Manifest
+from rest_framework_mongoengine.serializers import DocumentSerializer
 
 
 class ManifestSerializer(DocumentSerializer):
@@ -16,11 +16,12 @@ class ManifestViewSerializer(DocumentSerializer):
 
     class Meta:
         model = Manifest
-        exclude = ('id', 'identifier', 'order', 'embeddedEntirely', 'belongsTo', 'hidden', 'ownedBy', 'children', )
+        exclude = ('id', 'identifier', 'order', 'embeddedEntirely',
+                   'belongsTo', 'hidden', 'ownedBy', 'children', )
 
 
 class ManifestEmbeddedSerializer(DocumentSerializer):
-    
+
     class Meta:
         model = Manifest
         fields = ('ATid', 'ATtype', 'label', )

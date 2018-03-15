@@ -93,21 +93,12 @@ class Range_Test_POST(APIMongoTestCase):
     def test_a_range_with_no_id_given_can_be_successfully_created(self):
         data = {"range": json.loads(open(RANGE_SHORT).read())}
         del data["range"]["@id"]
-        response = self.client.post("/UofT/range", data)
+        response = self.client.post("/identifier/range", data)
         if settings.QUEUE_POST_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
         self.assertEqual(Range.objects()[0].label, 'Table of Contents')
-
-    def test_a_range_cannot_be_created_if_id_does_not_match_with_identifier(self):
-        data = {"range": json.loads(open(RANGE_SHORT).read())}
-        response = self.client.post("/UofT/range", data)
-        if settings.QUEUE_POST_ENABLED:
-            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
-            response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Range identifier must match with the identifier in @id.")
 
     def test_a_hidden_child_cannot_be_viewed(self):
         data = {"range": json.loads(open(RANGE_MEDIUM).read())}
@@ -261,12 +252,12 @@ class Range_Test_GET(APIMongoTestCase):
     def test_a_range_from_an_item_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get("/nonExistingItem/range/range1")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "Range with name 'range1' does not exist in identifier 'nonExistingItem'.")
+        self.assertEqual(response.data["error"], "range with name 'range1' does not exist in identifier 'nonExistingItem'.")
 
     def test_a_range_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get(URL+"/nonExistingRange")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "Range with name 'nonExistingRange' does not exist in identifier 'book1'.")
+        self.assertEqual(response.data["error"], "range with name 'nonExistingRange' does not exist in identifier 'book1'.")
 
     def test_a_range_can_be_viewed(self):
         response = self.client.get("/book1/range/range1")
@@ -355,15 +346,23 @@ class Range_Test_PUT(APIMongoTestCase):
         Range(label="range1", identifier="book1", name="range1", ATid="http://example.org/iiif/book1/range/range1", viewingHint="paged").save()
         Range(label="range2", identifier="book1", name="range2", ATid="http://example.org/iiif/book1/range/range2").save()
 
+
     def test_a_range_can_be_updated_sucessfully(self):
-        data = {"range": {"label": "new_range1", "viewingHint": "non-paged"}}
-        response = self.client.put(URL+"/range1", data)
+        data = {"range": json.loads(open(RANGE_MEDIUM).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"])
+        data = {"range": json.loads(open(RANGE_MEDIUM).read())}
+        data["range"]["label"] = "new_range1"
+        data["range"]["viewingHint"] = "non-paged"
+        response = self.client.put(URL+"/r0", data)
         if settings.QUEUE_PUT_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
-        self.assertEqual(Range.objects.get(identifier="book1", name="range1").label, 'new_range1')
-        self.assertEqual(Range.objects.get(identifier="book1", name="range1").viewingHint, 'non-paged')
+        self.assertEqual(Range.objects.get(identifier="book1", name="r0").label, 'new_range1')
+        self.assertEqual(Range.objects.get(identifier="book1", name="r0").viewingHint, 'non-paged')
 
     def test_a_range_with_invalid_data_cannot_be_updated_sucessfully(self):
         data = {"range": {"label": "new_range1", "viewingHint": ["non-paged"]}}
@@ -384,8 +383,13 @@ class Range_Test_PUT(APIMongoTestCase):
         self.assertEqual(response.data["responseBody"]["error"], "Range with name 'nonExistingRange' does not exist in identifier 'book1'.")
 
     def test_a_range_with_new_id_can_be_updated_successfully(self):
+        data = {"range": json.loads(open(RANGE_MEDIUM).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
         data = {"range": {"@id": "http://example.org/iiif/new_book1/range/new_range1", "viewingHint": "non-paged"}}
-        response = self.client.put(URL+"/range1", data)
+        response = self.client.put(URL+"/r0", data)
         if settings.QUEUE_PUT_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 

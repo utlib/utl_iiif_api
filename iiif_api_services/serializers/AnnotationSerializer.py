@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from rest_framework_mongoengine.serializers import DocumentSerializer
 from iiif_api_services.models.AnnotationModel import Annotation
+from rest_framework_mongoengine.serializers import DocumentSerializer
 
 
 class AnnotationSerializer(DocumentSerializer):
@@ -14,7 +14,8 @@ class AnnotationViewSerializer(DocumentSerializer):
 
     class Meta:
         model = Annotation
-        exclude = ('id', 'identifier', 'name', 'order', 'embeddedEntirely', 'belongsTo', 'hidden', 'ownedBy', 'children', )
+        exclude = ('id', 'identifier', 'name', 'order', 'embeddedEntirely',
+                   'belongsTo', 'hidden', 'ownedBy', 'children', )
 
 
 class AnnotationEmbeddedSerializer(DocumentSerializer):

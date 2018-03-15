@@ -149,23 +149,12 @@ class Sequence_Test_POST(APIMongoTestCase):
     def test_a_sequence_with_no_id_given_can_be_successfully_created(self):
         data = {"sequence": json.loads(open(SEQUENCE_SHORT).read())}
         del data["sequence"]["@id"]
-        response = self.client.post("/UofT/sequence", data)
+        response = self.client.post("/identifier/sequence", data)
         if settings.QUEUE_POST_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
         self.assertEqual(Sequence.objects()[0].label, 'Current Page Order')
-
-
-    def test_a_sequence_cannot_be_created_if_id_does_not_match_with_identifier(self):
-        data = {"sequence": json.loads(open(SEQUENCE_SHORT).read())}
-        response = self.client.post("/UofT/sequence", data)
-        if settings.QUEUE_POST_ENABLED:
-            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
-            response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Sequence identifier must match with the identifier in @id.")
-
 
     def test_a_hidden_child_cannot_be_viewed(self):
         data = {"sequence": json.loads(open(SEQUENCE_MEDIUM).read())}
@@ -235,12 +224,12 @@ class Sequence_Test_GET(APIMongoTestCase):
     def test_a_sequence_from_an_item_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get("/nonExistingItem/sequence/sequence1")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "Sequence with name 'sequence1' does not exist in identifier 'nonExistingItem'.")
+        self.assertEqual(response.data["error"], "sequence with name 'sequence1' does not exist in identifier 'nonExistingItem'.")
 
     def test_a_sequence_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get(URL+"/nonExistingSequence")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "Sequence with name 'nonExistingSequence' does not exist in identifier 'book1'.")
+        self.assertEqual(response.data["error"], "sequence with name 'nonExistingSequence' does not exist in identifier 'book1'.")
 
     def test_a_sequence_can_be_viewed(self):
         response = self.client.get("/book1/sequence/sequence1")
@@ -346,14 +335,20 @@ class Sequence_Test_PUT(APIMongoTestCase):
         Sequence(label="sequence2", identifier="book1", name="sequence2", ATid="http://example.org/iiif/book1/sequence/sequence2").save()
 
     def test_a_sequence_can_be_updated_sucessfully(self):
-        data = {"sequence": {"label": "new_sequence1", "viewingHint": "non-paged"}}
-        response = self.client.put(URL+"/sequence1", data)
+        data = {"sequence": json.loads(open(SEQUENCE_MEDIUM).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        data["sequence"]["label"] = "new_sequence1"
+        data["sequence"]["viewingHint"] = "non-paged"
+        response = self.client.put(URL+"/normal", data)
         if settings.QUEUE_PUT_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
-        self.assertEqual(Sequence.objects.get(identifier="book1", name="sequence1").label, 'new_sequence1')
-        self.assertEqual(Sequence.objects.get(identifier="book1", name="sequence1").viewingHint, 'non-paged')
+        self.assertEqual(Sequence.objects.get(identifier="book1", name="normal").label, 'new_sequence1')
+        self.assertEqual(Sequence.objects.get(identifier="book1", name="normal").viewingHint, 'non-paged')
 
     def test_a_sequence_with_invalid_data_cannot_be_updated(self):
         data = {"sequence": {"label": "new_sequence1", "viewingHint": ["invalid"]}}
@@ -374,8 +369,13 @@ class Sequence_Test_PUT(APIMongoTestCase):
         self.assertEqual(response.data["responseBody"]["error"], "Sequence with name 'nonExistingSequence' does not exist in identifier 'book1'.")
 
     def test_a_sequence_with_new_id_can_be_updated_successfully(self):
+        data = {"sequence": json.loads(open(SEQUENCE_MEDIUM).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
         data = {"sequence": {"@id": "http://example.org/iiif/new_book1/sequence/new_sequence1", "viewingHint": "non-paged"}}
-        response = self.client.put(URL+"/sequence1", data)
+        response = self.client.put(URL+"/normal", data)
         if settings.QUEUE_PUT_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 

@@ -119,13 +119,19 @@ class Activty_Test_Multiple(APIMongoTestCase):
         Activity(username="staff", requestMethod="POST", responseBody={"@id": "http://localhost:8000/book1-6565/manifest", "@type": "someType"}, responseCode=201, endTime=datetime.now()).save()
         Activity(username="staff", requestMethod="PUT", responseBody={"@id": "http://localhost:8000/book1-6565/manifest", "@type": "someType"}, responseCode=200, endTime=datetime.now()).save()
 
+
+    def test_to_view_all_activities(self):
+        response = self.client.get('/activity')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 28)
+
     def test_to_get_top_level_discovery_collection(self):
         response = self.client.get('/discovery')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["@context"][0], 'http://iiif.io/api/presentation/3/context.json')
         self.assertEqual(response.data["id"], settings.IIIF_BASE_URL+"/discovery")
         self.assertEqual(response.data["total"], 25)
-        self.assertEqual(response.data["label"], "University of Toronto IIIF Discovery Collection")
+        self.assertEqual(response.data["label"], "{0} IIIF Discovery Collection".format(settings.TOP_LEVEL_COLLECTION_LABEL))
         self.assertEqual(response.data["first"]["id"], settings.IIIF_BASE_URL+"/discovery-1")
         self.assertEqual(response.data["last"]["id"], settings.IIIF_BASE_URL+"/discovery-2")
 
@@ -135,7 +141,7 @@ class Activty_Test_Multiple(APIMongoTestCase):
         self.assertEqual(response.data["@context"][0], 'http://iiif.io/api/presentation/3/context.json')
         self.assertEqual(response.data["id"], settings.IIIF_BASE_URL+"/discovery")
         self.assertEqual(response.data["total"], 25)
-        self.assertEqual(response.data["label"], "University of Toronto IIIF Discovery Collection")
+        self.assertEqual(response.data["label"], "{0} IIIF Discovery Collection".format(settings.TOP_LEVEL_COLLECTION_LABEL))
         self.assertEqual(response.data["first"]["id"], settings.IIIF_BASE_URL+"/discovery-1")
         self.assertEqual(response.data["last"]["id"], settings.IIIF_BASE_URL+"/discovery-2")
 
@@ -146,7 +152,7 @@ class Activty_Test_Multiple(APIMongoTestCase):
         self.assertEqual(response.data["@context"][0], 'http://iiif.io/api/presentation/3/context.json')
         self.assertEqual(response.data["id"], settings.IIIF_BASE_URL+"/discovery/?from=2018-01-01&to="+toDate)
         self.assertEqual(response.data["total"], 25)
-        self.assertEqual(response.data["label"], "University of Toronto IIIF Discovery Collection")
+        self.assertEqual(response.data["label"], "{0} IIIF Discovery Collection".format(settings.TOP_LEVEL_COLLECTION_LABEL))
         self.assertEqual(response.data["first"]["id"], settings.IIIF_BASE_URL+"/discovery-1/?from=2018-01-01&to="+toDate)
         self.assertEqual(response.data["last"]["id"], settings.IIIF_BASE_URL+"/discovery-2/?from=2018-01-01&to="+toDate)
 
@@ -162,7 +168,7 @@ class Activty_Test_Multiple(APIMongoTestCase):
         self.assertEqual(response.data["id"], settings.IIIF_BASE_URL+"/discovery-1")
         self.assertEqual(response.data["total"], 25)
         self.assertEqual(response.data["count"], 20)
-        self.assertEqual(response.data["label"], "University of Toronto IIIF Discovery Collection: Page-1")
+        self.assertEqual(response.data["label"], "{0} IIIF Discovery Collection: Page-{1}".format(settings.TOP_LEVEL_COLLECTION_LABEL, 1))
         self.assertEqual(response.data["next"]["id"], settings.IIIF_BASE_URL+"/discovery-2")
         self.assertEqual(response.data["partOf"]["id"], settings.IIIF_BASE_URL+"/discovery")
         self.assertEqual(len(response.data["items"]), 20)
@@ -178,7 +184,7 @@ class Activty_Test_Multiple(APIMongoTestCase):
         self.assertEqual(response.data["id"], settings.IIIF_BASE_URL+"/discovery-1/?from=2018-01-01&to="+toDate)
         self.assertEqual(response.data["total"], 25)
         self.assertEqual(response.data["count"], 20)
-        self.assertEqual(response.data["label"], "University of Toronto IIIF Discovery Collection: Page-1")
+        self.assertEqual(response.data["label"], "{0} IIIF Discovery Collection: Page-{1}".format(settings.TOP_LEVEL_COLLECTION_LABEL, 1))
         self.assertEqual(response.data["next"]["id"], settings.IIIF_BASE_URL+"/discovery-2/?from=2018-01-01&to="+toDate)
         self.assertEqual(response.data["partOf"]["id"], settings.IIIF_BASE_URL+"/discovery/?from=2018-01-01&to="+toDate)
         self.assertEqual(len(response.data["items"]), 20)
@@ -232,7 +238,7 @@ class Activty_Test_Emtpy_Activities(APIMongoTestCase):
         self.assertEqual(response.data["@context"][0], 'http://iiif.io/api/presentation/3/context.json')
         self.assertEqual(response.data["id"], settings.IIIF_BASE_URL+"/discovery")
         self.assertEqual(response.data["total"], 0)
-        self.assertEqual(response.data["label"], "University of Toronto IIIF Discovery Collection")
+        self.assertEqual(response.data["label"], "{0} IIIF Discovery Collection".format(settings.TOP_LEVEL_COLLECTION_LABEL))
         self.assertEqual(response.data["first"], {})
         self.assertEqual(response.data["last"], {})
 
@@ -309,3 +315,12 @@ class Activty_Test_Delete_Activities(APIMongoTestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.data['detail'], "You don't have the necessary permission to perform this action. Please contact your admin.")
         self.assertEqual(len(Activity.objects), 4)
+
+
+
+class Queue_Test_View_All(APIMongoTestCase):
+    def test_to_view_all_pending_queue(self):
+        response = self.client.get('/queue')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+

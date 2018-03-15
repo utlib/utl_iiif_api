@@ -1,10 +1,11 @@
 from test_addons import APIMongoTestCase
 from rest_framework import status
 from rest_framework_jwt.settings import api_settings
-from django.conf import settings # import the settings file to get IIIF_BASE_URL
+from django.conf import settings
 from iiif_api_services.models.User import User
 import os
 import json
+from iiif_api_services.models.CollectionModel import Collection
 from iiif_api_services.models.ManifestModel import Manifest
 from iiif_api_services.models.SequenceModel import Sequence
 from iiif_api_services.models.RangeModel import Range
@@ -14,6 +15,7 @@ from iiif_api_services.models.AnnotationListModel import AnnotationList
 from iiif_api_services.models.RangeModel import Range
 
 MANIFEST_FULL = os.path.join(os.path.dirname(__file__), 'testData', 'permission', 'manifestFull.json')
+COLLECTION_MEDIUM = os.path.join(os.path.dirname(__file__), 'testData', 'collection', 'collectionMedium.json')
 
 
 class User_Staff_Test_POST_Permission(APIMongoTestCase):
@@ -155,6 +157,12 @@ class Test_Admin_Update_Staff_Permission(APIMongoTestCase):
         response = self.client.post('/book1/manifest', data)
         if settings.QUEUE_POST_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+        self.user = User.create_user('admin', 'admin@mail.com', 'adminpassword', True)
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
 
     def test_an_admin_can_update_a_nested_manifest_user_permissions(self):
         self.assertEqual(Manifest.objects[0].ownedBy, ["user1"])
@@ -162,13 +170,7 @@ class Test_Admin_Update_Staff_Permission(APIMongoTestCase):
         self.assertEqual(Sequence.objects[0].ownedBy, ["user1"])
         self.assertEqual(Annotation.objects[0].ownedBy, ["user1"])
         self.assertEqual(Range.objects[0].ownedBy, ["user1"])
-        self.user = User.create_user('admin', 'admin@mail.com', 'adminpassword', True)
-        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        payload = jwt_payload_handler(self.user)
-        token = jwt_encode_handler(payload)
-        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
-        data = {"collections": ["somecollectionID"], "manifests":[settings.IIIF_BASE_URL+'/book1/manifest'], "username": "NEWSTAFF", "action": "ADD"}
+        data = {"collections": [], "manifests":[settings.IIIF_BASE_URL+'/book1/manifest'], "username": "NEWSTAFF", "action": "ADD"}
         response = self.client.put('/auth/admin/updatePermission', data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Manifest.objects[0].ownedBy, ["user1", "NEWSTAFF"])
@@ -177,18 +179,37 @@ class Test_Admin_Update_Staff_Permission(APIMongoTestCase):
         self.assertEqual(Annotation.objects[0].ownedBy, ["user1", "NEWSTAFF"])
         self.assertEqual(Range.objects[0].ownedBy, ["user1", "NEWSTAFF"])
 
+
+    def test_an_admin_can_update_a_nested_collection_user_permissions(self):
+        data = {"collection": json.loads(open(COLLECTION_MEDIUM).read())}
+        response = self.client.post('/collections', data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(Manifest.objects[0].ownedBy, ["user1"])
+        self.assertEqual(Manifest.objects[1].ownedBy, [])
+        self.assertEqual(Manifest.objects[2].ownedBy, [])
+        self.assertEqual(Collection.objects[0].ownedBy, [])
+        self.assertEqual(Collection.objects[1].ownedBy, [])
+        self.assertEqual(Collection.objects[2].ownedBy, [])
+        data = {"collections": [settings.IIIF_BASE_URL+"/collections/book1"], "manifests":[], "username": "NEWSTAFF", "action": "ADD"}
+        response = self.client.put('/auth/admin/updatePermission', data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Manifest.objects[0].ownedBy, ["user1", "NEWSTAFF"])
+        self.assertEqual(Manifest.objects[1].ownedBy, ["NEWSTAFF"])
+        self.assertEqual(Manifest.objects[2].ownedBy, ["NEWSTAFF"])
+        self.assertEqual(Collection.objects[0].ownedBy, ["NEWSTAFF"])
+        self.assertEqual(Collection.objects[1].ownedBy, ["NEWSTAFF"])
+        self.assertEqual(Collection.objects[2].ownedBy, ["NEWSTAFF"])
+
+
     def test_an_admin_cannot_update_a_nested_manifest_user_permissions_with_validation_errors(self):
         self.assertEqual(Manifest.objects[0].ownedBy, ["user1"])
         self.assertEqual(Canvas.objects[0].ownedBy, ["user1"])
         self.assertEqual(Sequence.objects[0].ownedBy, ["user1"])
         self.assertEqual(Annotation.objects[0].ownedBy, ["user1"])
         self.assertEqual(Range.objects[0].ownedBy, ["user1"])
-        self.user = User.create_user('admin', 'admin@mail.com', 'adminpassword', True)
-        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        payload = jwt_payload_handler(self.user)
-        token = jwt_encode_handler(payload)
-        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
         data = {"manifests":[settings.IIIF_BASE_URL+'/book1/manifest'], "username": "NEWSTAFF", "action": "SOMETHING"}
         self.assertEqual(Manifest.objects[0].ownedBy, ["user1"])
         self.assertEqual(Canvas.objects[0].ownedBy, ["user1"])
@@ -202,13 +223,7 @@ class Test_Admin_Update_Staff_Permission(APIMongoTestCase):
         self.assertEqual(Sequence.objects[0].ownedBy, ["user1"])
         self.assertEqual(Annotation.objects[0].ownedBy, ["user1"])
         self.assertEqual(Range.objects[0].ownedBy, ["user1"])
-        self.user = User.create_user('admin', 'admin@mail.com', 'adminpassword', True)
-        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        payload = jwt_payload_handler(self.user)
-        token = jwt_encode_handler(payload)
-        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
-        data = {"collections": ["somecollectionID"], "manifests":[settings.IIIF_BASE_URL+'/book1/manifest'], "username": "user1", "action": "REMOVE"}
+        data = {"collections": [], "manifests":[settings.IIIF_BASE_URL+'/book1/manifest'], "username": "user1", "action": "REMOVE"}
         response = self.client.put('/auth/admin/updatePermission', data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Manifest.objects[0].ownedBy, [])
@@ -216,3 +231,45 @@ class Test_Admin_Update_Staff_Permission(APIMongoTestCase):
         self.assertEqual(Sequence.objects[0].ownedBy, [])
         self.assertEqual(Annotation.objects[0].ownedBy, [])
         self.assertEqual(Range.objects[0].ownedBy, [])
+
+
+    def test_an_update_user_permissions_with_username_missing_error(self):
+        data = {"collections": ["somecollectionID"], "manifests":[settings.IIIF_BASE_URL+'/book1/manifest'], "action": "REMOVE"}
+        response = self.client.put('/auth/admin/updatePermission', data)    
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["error"], "username field is required")
+
+
+    def test_an_update_user_permissions_with_non_exisinting_collection(self):
+        data = {"collections": ["somecollectionID"], "manifests":[], "username": "user1", "action": "REMOVE"}
+        response = self.client.put('/auth/admin/updatePermission', data)    
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["error"], "Collection with @id 'somecollectionID' does not exist.")
+
+
+    def test_an_update_user_permissions_with_non_exisinting_manifest(self):
+        data = {"collections": [], "manifests":["somemanifestID"], "username": "user1", "action": "REMOVE"}
+        response = self.client.put('/auth/admin/updatePermission', data)    
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["error"], "Manifest with @id 'somemanifestID' does not exist.")
+
+
+    def test_an_update_user_permissions_with_username_validation_error(self):
+        data = {"collections": ["somecollectionID"], "manifests":[settings.IIIF_BASE_URL+'/book1/manifest'], "username": ["user1"], "action": "REMOVE"}
+        response = self.client.put('/auth/admin/updatePermission', data)    
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["error"], "username must be a string.")
+
+
+    def test_an_update_user_permissions_with_action_missing_error(self):
+        data = {"collections": ["somecollectionID"], "manifests":[settings.IIIF_BASE_URL+'/book1/manifest'], "username": "user1"}
+        response = self.client.put('/auth/admin/updatePermission', data)    
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["error"], "action field is required. Possible values are 'ADD' and 'REMOVE'.")
+
+
+    def test_an_update_user_permissions_with_action_validation_error(self):
+        data = {"collections": ["somecollectionID"], "manifests":[settings.IIIF_BASE_URL+'/book1/manifest'], "username": "user1", "action": "INVALID"}
+        response = self.client.put('/auth/admin/updatePermission', data)    
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["error"], "Allowed values for action are 'ADD' and 'REMOVE'.")

@@ -7,6 +7,7 @@ from django.conf import settings  # import the settings file to get IIIF_BASE_UR
 from iiif_api_services.models.User import User
 from iiif_api_services.models.QueueModel import Queue
 from iiif_api_services.models.ActivityModel import Activity
+from iiif_api_services.models.CollectionModel import Collection
 from iiif_api_services.models.ManifestModel import Manifest
 from iiif_api_services.models.SequenceModel import Sequence
 from iiif_api_services.models.RangeModel import Range
@@ -14,6 +15,7 @@ from iiif_api_services.models.CanvasModel import Canvas
 from iiif_api_services.models.AnnotationModel import Annotation
 from iiif_api_services.models.AnnotationListModel import AnnotationList
 from iiif_api_services.models.RangeModel import Range
+from django.test import override_settings
 
 
 MANIFEST_SHORT = os.path.join(os.path.dirname(__file__), 'testData', 'manifest', 'manifestShort.json')
@@ -223,9 +225,12 @@ class Manifest_Simple_Test_With_Authentication_And_Admin_Permission(APIMongoTest
         self.assertEqual(len(Manifest.objects()), 1)
 
 
-
-class Manifest_Short_Test_POST(APIMongoTestCase):
+@override_settings()
+class Manifest_Short_Test_POST_Without_Queue(APIMongoTestCase):
     def test_a_short_manifest_can_be_successfully_created(self):
+        settings.QUEUE_POST_ENABLED = False
+        settings.QUEUE_PUT_ENABLED = False
+        settings.QUEUE_DELETE_ENABLED = False
         self.user = User.create_user('staff', 'staff@mail.com', 'password')
         jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
@@ -253,6 +258,110 @@ class Manifest_Short_Test_POST(APIMongoTestCase):
         self.assertEqual(createdManifest.rendering["@id"], 'http://example.org/iiif/book1.pdf')
         self.assertEqual(createdManifest.within, 'http://example.org/collections/books')
 
+
+@override_settings()
+class Manifest_Short_Test_POST_With_THREAD_Queue(APIMongoTestCase):
+    def test_a_short_manifest_can_be_successfully_created(self):
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'THREAD'
+        self.user = User.create_user('staff', 'staff@mail.com', 'password')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        data = {"manifest": json.loads(open(MANIFEST_SHORT).read())}
+        response = self.client.post('/book1/manifest', data)
+        if settings.QUEUE_POST_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL+"/book1/manifest")
+        createdManifest = Manifest.objects.get(identifier="book1")
+        self.assertEqual(createdManifest.label, 'Book 1')
+        self.assertEqual(len(createdManifest.metadata), 4)
+        self.assertEqual(createdManifest.metadata[1]["value"][1]["@language"], 'fr')
+        self.assertEqual(createdManifest.thumbnail["service"]["@id"], 'http://example.org/images/book1-page1')
+        self.assertEqual(createdManifest.viewingDirection, 'right-to-left')
+        self.assertEqual(createdManifest.logo["service"]["@id"], 'http://example.org/service/inst1')
+        self.assertEqual(createdManifest.related["@id"], 'http://example.org/videos/video-book1.mpg')
+        self.assertEqual(createdManifest.service["@id"], 'http://example.org/service/example')
+        self.assertEqual(createdManifest.seeAlso["@id"], 'http://example.org/library/catalog/book1.xml')
+        self.assertEqual(createdManifest.rendering["@id"], 'http://example.org/iiif/book1.pdf')
+        self.assertEqual(createdManifest.within, 'http://example.org/collections/books')
+
+
+@override_settings()
+class Manifest_Short_Test_POST_With_PROCESS_Queue(APIMongoTestCase):
+    def test_a_short_manifest_can_be_successfully_created(self):
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'PROCESS'
+        self.user = User.create_user('staff', 'staff@mail.com', 'password')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        data = {"manifest": json.loads(open(MANIFEST_SHORT).read())}
+        response = self.client.post('/book1/manifest', data)
+        if settings.QUEUE_POST_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL+"/book1/manifest")
+        createdManifest = Manifest.objects.get(identifier="book1")
+        self.assertEqual(createdManifest.label, 'Book 1')
+        self.assertEqual(len(createdManifest.metadata), 4)
+        self.assertEqual(createdManifest.metadata[1]["value"][1]["@language"], 'fr')
+        self.assertEqual(createdManifest.thumbnail["service"]["@id"], 'http://example.org/images/book1-page1')
+        self.assertEqual(createdManifest.viewingDirection, 'right-to-left')
+        self.assertEqual(createdManifest.logo["service"]["@id"], 'http://example.org/service/inst1')
+        self.assertEqual(createdManifest.related["@id"], 'http://example.org/videos/video-book1.mpg')
+        self.assertEqual(createdManifest.service["@id"], 'http://example.org/service/example')
+        self.assertEqual(createdManifest.seeAlso["@id"], 'http://example.org/library/catalog/book1.xml')
+        self.assertEqual(createdManifest.rendering["@id"], 'http://example.org/iiif/book1.pdf')
+        self.assertEqual(createdManifest.within, 'http://example.org/collections/books')
+
+
+@override_settings()
+class Manifest_Short_Test_POST_With_CELERY_Queue(APIMongoTestCase):
+    def test_a_short_manifest_can_be_successfully_created(self):
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'CELERY'
+        self.user = User.create_user('staff', 'staff@mail.com', 'password')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        data = {"manifest": json.loads(open(MANIFEST_SHORT).read())}
+        response = self.client.post('/book1/manifest', data)
+        if settings.QUEUE_POST_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL+"/book1/manifest")
+        createdManifest = Manifest.objects.get(identifier="book1")
+        self.assertEqual(createdManifest.label, 'Book 1')
+        self.assertEqual(len(createdManifest.metadata), 4)
+        self.assertEqual(createdManifest.metadata[1]["value"][1]["@language"], 'fr')
+        self.assertEqual(createdManifest.thumbnail["service"]["@id"], 'http://example.org/images/book1-page1')
+        self.assertEqual(createdManifest.viewingDirection, 'right-to-left')
+        self.assertEqual(createdManifest.logo["service"]["@id"], 'http://example.org/service/inst1')
+        self.assertEqual(createdManifest.related["@id"], 'http://example.org/videos/video-book1.mpg')
+        self.assertEqual(createdManifest.service["@id"], 'http://example.org/service/example')
+        self.assertEqual(createdManifest.seeAlso["@id"], 'http://example.org/library/catalog/book1.xml')
+        self.assertEqual(createdManifest.rendering["@id"], 'http://example.org/iiif/book1.pdf')
+        self.assertEqual(createdManifest.within, 'http://example.org/collections/books')
 
 
 class Manifest_Full_Test_POST(APIMongoTestCase):
@@ -361,24 +470,6 @@ class Manifest_Full_Test_POST_With_Validation_Errors_In_Manifest(APIMongoTestCas
         token = jwt_encode_handler(payload)
         self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
         self.data = {"manifest": json.loads(open(MANIFEST_FULL).read())}
-
-    def test_a_full_manifest_cannot_be_successfully_created_with_identifier_being_UofT(self):
-        response = self.client.post('/UofT/manifest', self.data)
-        if settings.QUEUE_POST_ENABLED:
-            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
-            response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Item name cannot be: UofT.")
-
-    def test_a_full_manifest_cannot_be_successfully_created_with_identifier_being_different_from_url(self):
-        response = self.client.post('/notBook1/manifest', self.data)
-        if settings.QUEUE_POST_ENABLED:
-            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
-            response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Manifest identifier must match with the identifier in @id.")
 
     def test_a_full_manifest_cannot_be_successfully_created_with_duplicate_identifier(self):
         response = self.client.post('/book1/manifest', self.data)
@@ -633,18 +724,102 @@ class Manifest_Test_POST_Miscellaneous(APIMongoTestCase):
         self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
         self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL+"/book1/manifest")
 
-    def test_a_manifest_cannot_be_created_if_id_does_not_match_with_identifier(self):
+
+@override_settings()
+class Manifest_Short_Test_PUT_Without_QUEUE(APIMongoTestCase):
+    def test_a_short_manifest_can_be_successfully_updated(self):
+        settings.QUEUE_POST_ENABLED = False
+        settings.QUEUE_PUT_ENABLED = False
+        settings.QUEUE_DELETE_ENABLED = False
+        self.user = User.create_user('staff', 'staff@mail.com', 'password')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
         data = {"manifest": json.loads(open(MANIFEST_SHORT).read())}
-        response = self.client.post("/book3/manifest", data)
+        response = self.client.post('/book1/manifest', data)
         if settings.QUEUE_POST_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+        self.assertEqual(Manifest.objects().get(identifier="book1").label, "Book 1")
+        data["manifest"]["label"] = "NEW LABEL"
+        response = self.client.put('/book1/manifest', data)
+        if settings.QUEUE_PUT_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Manifest identifier must match with the identifier in @id.")
+        self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
+        self.assertEqual(Manifest.objects().get(identifier="book1").label, "NEW LABEL")
 
 
-class Manifest_Short_Test_PUT(APIMongoTestCase):
+@override_settings()
+class Manifest_Short_Test_PUT_With_THREAD_QUEUE(APIMongoTestCase):
     def test_a_short_manifest_can_be_successfully_updated(self):
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'THREAD'
+        self.user = User.create_user('staff', 'staff@mail.com', 'password')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        data = {"manifest": json.loads(open(MANIFEST_SHORT).read())}
+        response = self.client.post('/book1/manifest', data)
+        if settings.QUEUE_POST_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+        self.assertEqual(Manifest.objects().get(identifier="book1").label, "Book 1")
+        data["manifest"]["label"] = "NEW LABEL"
+        response = self.client.put('/book1/manifest', data)
+        if settings.QUEUE_PUT_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
+        self.assertEqual(Manifest.objects().get(identifier="book1").label, "NEW LABEL")
+
+
+
+@override_settings()
+class Manifest_Short_Test_PUT_With_PROCESS_QUEUE(APIMongoTestCase):
+    def test_a_short_manifest_can_be_successfully_updated(self):
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'PROCESS'
+        self.user = User.create_user('staff', 'staff@mail.com', 'password')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        data = {"manifest": json.loads(open(MANIFEST_SHORT).read())}
+        response = self.client.post('/book1/manifest', data)
+        if settings.QUEUE_POST_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+        self.assertEqual(Manifest.objects().get(identifier="book1").label, "Book 1")
+        data["manifest"]["label"] = "NEW LABEL"
+        response = self.client.put('/book1/manifest', data)
+        if settings.QUEUE_PUT_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
+        self.assertEqual(Manifest.objects().get(identifier="book1").label, "NEW LABEL")
+
+
+
+@override_settings()
+class Manifest_Short_Test_PUT_With_CELERY_QUEUE(APIMongoTestCase):
+    def test_a_short_manifest_can_be_successfully_updated(self):
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'CELERY'
         self.user = User.create_user('staff', 'staff@mail.com', 'password')
         jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
         jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
@@ -859,9 +1034,9 @@ class Manifest_Full_Test_PUT_With_New_Nested_Objects(APIMongoTestCase):
             self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
+        print response.data
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
         self.assertEqual(len(Annotation.objects()), 7)
-
         annotation4 = Annotation.objects().get(identifier="book1", name="anno4")
         annotation5 = Annotation.objects().get(identifier="book1", name="anno5")
         annotation6 = Annotation.objects().get(identifier="book1", name="anno6")
@@ -890,28 +1065,6 @@ class Manifest_Full_Test_PUT_With_New_Nested_Objects(APIMongoTestCase):
         self.assertEqual(len(list2.belongsTo), 1)
         self.assertTrue(settings.IIIF_BASE_URL + "/book1/canvas/canvas2" in list2.belongsTo)
         self.assertEqual(list2.ownedBy, ["staff"])
-
-
-
-class Manifest_Full_Test_PUT_With_Validation_Errors_In_Manifest(APIMongoTestCase):
-    def setUp(self):
-        Manifest(label="manifest1", identifier="book1", ATid="http://example.org/iiif/book1/manifest", ownedBy=["staff"]).save()
-        self.user = User.create_user('staff', 'staff@mail.com', 'password')
-        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
-        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-        payload = jwt_payload_handler(self.user)
-        token = jwt_encode_handler(payload)
-        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
-        self.data = {"manifest": json.loads(open(MANIFEST_FULL).read())}
-
-    def test_a_full_manifest_cannot_be_successfully_updated_with_identifier_being_UofT(self):
-        response = self.client.put('/UofT/manifest', self.data)
-        if settings.QUEUE_PUT_ENABLED:
-            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
-            response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Item name cannot be: UofT.")
 
 
 
@@ -983,6 +1136,7 @@ class Manifest_Full_Test_PUT_With_Validation_Errors_In_Nested_Objects(APIMongoTe
             self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
+        print response.data
         self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
         self.assertEqual(response.data["responseBody"]["error"]["viewingHint"][0], "Not a valid string.")
 
@@ -1031,17 +1185,6 @@ class Manifest_Test_PUT_Miscellaneous(APIMongoTestCase):
         self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL + "/new_book1/manifest")
 
 
-    def test_the_top_level_uoft_manifest_cannot_be_updated(self):
-        data = {"manifest": {"@id": "http://example.org/iiif/UofT/manifest", "viewingHint": "non-paged"}}
-        response = self.client.put("/UofT/manifest", data)
-        if settings.QUEUE_PUT_ENABLED:
-            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
-            response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "Item name cannot be: UofT.")
-
-
     def test_a_manifest_with_new_id_will_update_its_nested_objects_belongsTo_field(self):
         data = {"manifest": json.loads(open(MANIFEST_FULL).read())}
         response = self.client.post('/book1/manifest', data)
@@ -1060,6 +1203,29 @@ class Manifest_Test_PUT_Miscellaneous(APIMongoTestCase):
         self.assertEqual(Sequence.objects.get(identifier="book1", name='sequence2').belongsTo[0], settings.IIIF_BASE_URL + "/not-book1/manifest")
         self.assertEqual(Sequence.objects.get(identifier="book1", name='sequence3').belongsTo[0], settings.IIIF_BASE_URL + "/not-book1/manifest")
 
+    def test_a_manifest_with_new_id_will_update_its_parent_objects_children_field(self):
+        data = {"manifest": json.loads(open(MANIFEST_FULL).read())}
+        response = self.client.post('/book1/manifest', data)
+        if settings.QUEUE_PUT_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+        response = self.client.post('/collections', {"collection": {"@id": settings.IIIF_BASE_URL + '/collections/parent', "manifests": [{"@id": settings.IIIF_BASE_URL + "/book1/manifest"}]}})
+        if settings.QUEUE_PUT_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+        self.assertEqual(Sequence.objects.get(identifier="book1", name='sequence2').belongsTo[0], settings.IIIF_BASE_URL + "/book1/manifest")
+        self.assertEqual(Sequence.objects.get(identifier="book1", name='sequence3').belongsTo[0], settings.IIIF_BASE_URL + "/book1/manifest")
+        self.assertEqual(Collection.objects.get(name="parent").children[0], settings.IIIF_BASE_URL + "/book1/manifest")
+        data["manifest"]["@id"] = "http://example.org/iiif/not-book1/manifest"
+        response = self.client.put('/book1/manifest', data)
+        if settings.QUEUE_PUT_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
+        self.assertEqual(Sequence.objects.get(identifier="book1", name='sequence2').belongsTo[0], settings.IIIF_BASE_URL + "/not-book1/manifest")
+        self.assertEqual(Sequence.objects.get(identifier="book1", name='sequence3').belongsTo[0], settings.IIIF_BASE_URL + "/not-book1/manifest")
+        self.assertEqual(Collection.objects.get(name="parent").children[0], settings.IIIF_BASE_URL + "/not-book1/manifest")
 
     def test_a_manifest_can_be_updated_with_a_new_belongsTo_field_will_replace_existing_values(self):
         Manifest(label="book1", identifier="book3", ATid="http://example.org/iiif/book3/manifest", belongsTo=[settings.IIIF_BASE_URL +"/collection/book1"], ownedBy=["staff"]).save()
@@ -1106,8 +1272,8 @@ class Manifest_Test_PUT_Miscellaneous(APIMongoTestCase):
         self.assertTrue(settings.IIIF_BASE_URL +"/book156/manifest" in Range.objects.get(identifier='book1', name="range1").belongsTo)
 
 
-
-class Manifest_Test_DELETE(APIMongoTestCase):
+@override_settings()
+class Manifest_Test_DELETE_Without_QUEUE(APIMongoTestCase):
     def setUp(self):
         self.user = User.create_user('staff', 'staff@mail.com', 'password')
         jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
@@ -1124,6 +1290,182 @@ class Manifest_Test_DELETE(APIMongoTestCase):
         self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
         self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL+"/book1/manifest")
         self.data = {"manifest": self.client.get('/book1/manifest').data}
+        settings.QUEUE_POST_ENABLED = False
+        settings.QUEUE_PUT_ENABLED = False
+        settings.QUEUE_DELETE_ENABLED = False
+
+
+    def test_a_manifest_can_be_deleted_sucessfully(self):
+        response = self.client.delete("/book1/manifest")
+        if settings.QUEUE_DELETE_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data["responseBody"]['message'], "Successfully deleted the Manifest of 'book1'.")
+
+    def test_a_manifest_from_an_item_that_does_not_exist_cannot_be_deleted(self):
+        response = self.client.delete("/nonExistingItem/manifest")
+        if settings.QUEUE_DELETE_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["responseBody"]['error'], "'nonExistingItem' does not have a Manifest.")
+
+
+    def test_deleting_a_manifest_will_delete_all_of_its_nested_objects(self):
+        response = self.client.delete("/book1/manifest")
+        if settings.QUEUE_DELETE_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data["responseBody"]['message'], "Successfully deleted the Manifest of 'book1'.")
+        self.assertEqual(len(Manifest.objects), 0)
+        self.assertEqual(len(Sequence.objects), 0)
+        self.assertEqual(len(Range.objects), 0)
+        self.assertEqual(len(Canvas.objects), 0)
+        self.assertEqual(len(Annotation.objects), 0)
+        self.assertEqual(len(AnnotationList.objects), 0)
+
+
+@override_settings()
+class Manifest_Test_DELETE_With_THREAD_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('staff', 'staff@mail.com', 'password')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        self.data = {"manifest": json.loads(open(MANIFEST_FULL).read())}
+        response = self.client.post('/book1/manifest', self.data)
+        if settings.QUEUE_POST_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL+"/book1/manifest")
+        self.data = {"manifest": self.client.get('/book1/manifest').data}
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'THREAD'
+
+
+    def test_a_manifest_can_be_deleted_sucessfully(self):
+        response = self.client.delete("/book1/manifest")
+        if settings.QUEUE_DELETE_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data["responseBody"]['message'], "Successfully deleted the Manifest of 'book1'.")
+
+    def test_a_manifest_from_an_item_that_does_not_exist_cannot_be_deleted(self):
+        response = self.client.delete("/nonExistingItem/manifest")
+        if settings.QUEUE_DELETE_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["responseBody"]['error'], "'nonExistingItem' does not have a Manifest.")
+
+
+    def test_deleting_a_manifest_will_delete_all_of_its_nested_objects(self):
+        response = self.client.delete("/book1/manifest")
+        if settings.QUEUE_DELETE_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data["responseBody"]['message'], "Successfully deleted the Manifest of 'book1'.")
+        self.assertEqual(len(Manifest.objects), 0)
+        self.assertEqual(len(Sequence.objects), 0)
+        self.assertEqual(len(Range.objects), 0)
+        self.assertEqual(len(Canvas.objects), 0)
+        self.assertEqual(len(Annotation.objects), 0)
+        self.assertEqual(len(AnnotationList.objects), 0)
+
+
+
+@override_settings()
+class Manifest_Test_DELETE_With_PROCESS_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('staff', 'staff@mail.com', 'password')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        self.data = {"manifest": json.loads(open(MANIFEST_FULL).read())}
+        response = self.client.post('/book1/manifest', self.data)
+        if settings.QUEUE_POST_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL+"/book1/manifest")
+        self.data = {"manifest": self.client.get('/book1/manifest').data}
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'PROCESS'
+
+
+    def test_a_manifest_can_be_deleted_sucessfully(self):
+        response = self.client.delete("/book1/manifest")
+        if settings.QUEUE_DELETE_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data["responseBody"]['message'], "Successfully deleted the Manifest of 'book1'.")
+
+    def test_a_manifest_from_an_item_that_does_not_exist_cannot_be_deleted(self):
+        response = self.client.delete("/nonExistingItem/manifest")
+        if settings.QUEUE_DELETE_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["responseBody"]['error'], "'nonExistingItem' does not have a Manifest.")
+
+
+    def test_deleting_a_manifest_will_delete_all_of_its_nested_objects(self):
+        response = self.client.delete("/book1/manifest")
+        if settings.QUEUE_DELETE_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data["responseBody"]['message'], "Successfully deleted the Manifest of 'book1'.")
+        self.assertEqual(len(Manifest.objects), 0)
+        self.assertEqual(len(Sequence.objects), 0)
+        self.assertEqual(len(Range.objects), 0)
+        self.assertEqual(len(Canvas.objects), 0)
+        self.assertEqual(len(Annotation.objects), 0)
+        self.assertEqual(len(AnnotationList.objects), 0)
+
+
+
+@override_settings()
+class Manifest_Test_DELETE_With_CELERY_QUEUE(APIMongoTestCase):
+    def setUp(self):
+        self.user = User.create_user('staff', 'staff@mail.com', 'password')
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+        payload = jwt_payload_handler(self.user)
+        token = jwt_encode_handler(payload)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
+        self.data = {"manifest": json.loads(open(MANIFEST_FULL).read())}
+        response = self.client.post('/book1/manifest', self.data)
+        if settings.QUEUE_POST_ENABLED:
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
+        self.assertEqual(response.data["responseBody"]["@id"], settings.IIIF_BASE_URL+"/book1/manifest")
+        self.data = {"manifest": self.client.get('/book1/manifest').data}
+        settings.QUEUE_POST_ENABLED = True
+        settings.QUEUE_PUT_ENABLED = True
+        settings.QUEUE_DELETE_ENABLED = True
+        settings.QUEUE_RUNNER = 'CELERY'
 
 
     def test_a_manifest_can_be_deleted_sucessfully(self):
@@ -1189,11 +1531,29 @@ class Manifest_Test_GET(APIMongoTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["metadata"]), 4)
         self.assertEqual(len(response.data["sequences"]), 3)
-        self.assertEqual(len(response.data["sequences"][0]), 7)
-        self.assertEqual(len(response.data["sequences"][0]["canvases"][0]), 8)
+        self.assertEqual(len(response.data["sequences"][0]["canvases"]), 5)
         self.assertEqual(len(response.data["sequences"][0]["canvases"][3]["images"]), 2)
         self.assertEqual(len(response.data["sequences"][0]["canvases"][2]["images"][0]["resource"]), 2)
         self.assertEqual(len(response.data["structures"]), 3)
+
+    def test_a_full_sequence_can_be_viewed(self):
+        sequence_name = Sequence.objects.get(label="Sequence1").name
+        response = self.client.get("/book1/sequence/"+sequence_name)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["canvases"]), 5)
+        self.assertEqual(len(response.data["canvases"][3]["images"]), 2)
+        self.assertEqual(len(response.data["canvases"][2]["images"][0]["resource"]), 2)
+
+    def test_a_full_canvas_can_be_viewed(self):
+        response = self.client.get("/book1/canvas/canvas1")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["images"]), 1)
+        self.assertEqual(response.data["images"][0]["resource"]["@id"], 'http://example.org/iiif/book1/res/page1.jpg')
+
+    def test_a_full_annotation_list_can_be_viewed(self):
+        response = self.client.get("/book1/list/list1")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["ATtype"], "sc:AnnotationList")
 
     def test_a_hidden_child_cannot_be_viewed(self):
         range1 = Range.objects.get(identifier='book1', name='range1')

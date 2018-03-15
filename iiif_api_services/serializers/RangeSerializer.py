@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from rest_framework_mongoengine.serializers import DocumentSerializer
 from iiif_api_services.models.RangeModel import Range
+from rest_framework_mongoengine.serializers import DocumentSerializer
 
 
 class RangeSerializer(DocumentSerializer):
@@ -15,7 +15,8 @@ class RangeViewSerializer(DocumentSerializer):
 
     class Meta:
         model = Range
-        exclude = ('id', 'identifier', 'name', 'order', 'embeddedEntirely', 'belongsTo', 'hidden', 'ownedBy', )
+        exclude = ('id', 'identifier', 'name', 'order',
+                   'embeddedEntirely', 'belongsTo', 'hidden', 'ownedBy', )
 
 
 class RangeEmbeddedSerializer(DocumentSerializer):

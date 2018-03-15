@@ -110,24 +110,26 @@ class AnnotationList_Test_POST(APIMongoTestCase):
         self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
         self.assertEqual(response.data["responseBody"]["error"]["ATid"][0], 'This field must be unique.')
 
+    def test_a_annotationList_with_errors_in_sub_annotations_cannot_be_created(self):
+        data = {"annotationList": json.loads(open(ANNOTATIONLIST_MEDIUM).read())}
+        data["annotationList"]['resources'][0]['viewingHint'] = ['invalid']
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"]) 
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]["viewingHint"][0], 'Not a valid string.')
+
+
     def test_a_annotationList_with_no_id_given_can_be_successfully_created(self):
         data = {"annotationList": json.loads(open(ANNOTATIONLIST_SHORT).read())}
         del data["annotationList"]["@id"]
-        response = self.client.post("/UofT/list", data)
+        response = self.client.post("/"+settings.TOP_LEVEL_COLLECTION_NAME+"/list", data)
         if settings.QUEUE_POST_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
         self.assertEqual(response.data["responseCode"], status.HTTP_201_CREATED)
         self.assertEqual(AnnotationList.objects()[0].label, 'Awesome annotation list')
-
-    def test_a_annotationList_cannot_be_created_if_id_does_not_match_with_identifier(self):
-        data = {"annotationList": json.loads(open(ANNOTATIONLIST_SHORT).read())}
-        response = self.client.post("/UofT/list", data)
-        if settings.QUEUE_POST_ENABLED:
-            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
-            response = self.client.get(response.data["status"]) 
-        self.assertEqual(response.data["responseCode"], status.HTTP_412_PRECONDITION_FAILED)
-        self.assertEqual(response.data["responseBody"]["error"], "AnnotationList identifier must match with the identifier in @id.")
 
     def test_a_hidden_child_cannot_be_viewed(self):
         data = {"annotationList": json.loads(open(ANNOTATIONLIST_MEDIUM).read())}
@@ -149,12 +151,12 @@ class AnnotationList_Test_GET(APIMongoTestCase):
     def test_a_annotationList_from_an_item_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get("/nonExistingItem/list/annotationList1")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "AnnotationList with name 'annotationList1' does not exist in identifier 'nonExistingItem'.")
+        self.assertEqual(response.data["error"], "annotationList with name 'annotationList1' does not exist in identifier 'nonExistingItem'.")
 
     def test_a_annotationList_that_does_not_exist_cannot_be_viewed(self):
         response = self.client.get(URL+"/nonExistingAnnotationList")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "AnnotationList with name 'nonExistingAnnotationList' does not exist in identifier 'book1'.")
+        self.assertEqual(response.data["error"], "annotationList with name 'nonExistingAnnotationList' does not exist in identifier 'book1'.")
 
     def test_a_annotationList_can_be_viewed(self):
         response = self.client.get("/book1/list/annotationList1")
@@ -242,16 +244,46 @@ class AnnotationList_Test_PUT(APIMongoTestCase):
         self.client.credentials(HTTP_AUTHORIZATION='JWT ' + token)
         AnnotationList(label="annotationList1", identifier="book1", name="annotationList1", ATid="http://example.org/iiif/book1/list/annotationList1", viewingHint="paged", ownedBy=["user1"]).save()
         AnnotationList(label="annotationList2", identifier="book1", name="annotationList2", ATid="http://example.org/iiif/book1/list/annotationList2", ownedBy=["user1"]).save()
-
-    def test_a_annotationList_can_be_updated_sucessfully(self):
-        data = {"annotationList": {"label": "new_annotationList1", "viewingHint": "non-paged"}}
-        response = self.client.put(URL+"/annotationList1", data)
-        if settings.QUEUE_PUT_ENABLED:
+        data = {"annotationList": json.loads(open(ANNOTATIONLIST_FULL).read())}
+        response = self.client.post(URL, data)
+        if settings.QUEUE_POST_ENABLED:
             while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
             response = self.client.get(response.data["status"]) 
+
+    def test_a_annotationList_can_be_updated_sucessfully(self):
+        data = {"annotationList": json.loads(open(ANNOTATIONLIST_FULL).read())}
+        data["annotationList"]["label"] = "new_annotationList1"
+        data["annotationList"]["viewingHint"] = "non-paged"
+        response = self.client.put(URL+"/p100", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"])
+        print response.data
         self.assertEqual(response.data["responseCode"], status.HTTP_200_OK)
-        self.assertEqual(AnnotationList.objects()[0].label, 'new_annotationList1')
-        self.assertEqual(AnnotationList.objects()[0].viewingHint, 'non-paged')
+        self.assertEqual(AnnotationList.objects()[2].label, 'new_annotationList1')
+        self.assertEqual(AnnotationList.objects()[2].viewingHint, 'non-paged')
+
+    def test_a_annotationList_with_validation_error_cannot_be_updated(self):
+        data = {"annotationList": json.loads(open(ANNOTATIONLIST_FULL).read())}
+        data["annotationList"]["viewingHint"] = ["invalid"]
+        response = self.client.put(URL+"/p100", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"])
+        print response.data
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]["viewingHint"][0], "Not a valid string.")
+
+    def test_a_annotationList_with_validation_error_in_children_cannot_be_updated(self):
+        data = {"annotationList": json.loads(open(ANNOTATIONLIST_FULL).read())}
+        data["annotationList"]['resources'][0]["viewingHint"] = ["invalid"]
+        response = self.client.put(URL+"/p100", data)
+        if settings.QUEUE_PUT_ENABLED:
+            while self.client.get(response.data["status"]).status_code!=status.HTTP_301_MOVED_PERMANENTLY: pass # Wait till background process finishes
+            response = self.client.get(response.data["status"])
+        print response.data
+        self.assertEqual(response.data["responseCode"], status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["responseBody"]["error"]["viewingHint"][0], "Not a valid string.")
 
     def test_a_annotationList_that_does_not_exist_cannot_be_updated(self):
         data = {"annotationList": {"label": "new_annotationList1", "viewingHint": "non-paged"}}

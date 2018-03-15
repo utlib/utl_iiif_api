@@ -114,12 +114,13 @@ LORIS_URL = 'https://iiif.library.utoronto.ca/image/v2/' # The base url for imag
 REGISTER_SECRET_KEY = "BATMAN" # Secret key which allows an Admin user to register. Overide this vale in production.
 IIIF_BASE_URL = "http://localhost:8000" # Base url to generate the @id field in IIIF objects. Overide this vale in production.
 IIIF_CONTEXT = "http://iiif.io/api/presentation/2/context.json" # Default IIIF @context to use for this API.
-
+TOP_LEVEL_COLLECTION_NAME = "UofT" # The {name} of the Organization to display in top level Collection. {scheme}://{host}/{prefix}/collection/{name}.
+TOP_LEVEL_COLLECTION_LABEL = "University of Toronto Libraries" # The label of the Organization top level Collection.
 
 TESTING = len(sys.argv) > 1 and sys.argv[1] == 'test'
 if TESTING:
     # Overide the Loris config for test environment
-    LORIS_DIRECTORY = '/tmp/IIIFAPI/Testing/Images/'
+    LORIS_DIRECTORY = '/tmp/IIIFAPI/Testing/Test_Images/'
     LORIS_URL = 'http://localhost/loris/iiifAPI/'
     # Run background tasks synchronously for CELERY if enabled
     CELERY_ALWAYS_EAGER = True
@@ -135,6 +136,7 @@ if TESTING:
         '--cover-erase',
         '--with-coverage',
         '--cover-html',
+        '--cover-xml',
         '--cover-package=iiif_api_services',
         '--with-xunit',
         '--xunit-file=testsXMLResults.xml',

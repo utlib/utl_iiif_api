@@ -58,3 +58,15 @@ class Search_IIIF_API_Within_Manifest(APIMongoTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["ATid"], settings.IIIF_BASE_URL + '/book1/manifest/search/?q=top&motivation=invalid')
         self.assertEqual(len(response.data["resources"]), 0)
+
+
+    def test_to_search_a_single_matching_resource_with_missing_query(self):
+        response = self.client.get('/book1/manifest/search/?motivation=invalid')
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.data["error"], "The parameter 'q' is required.")
+
+
+    def test_to_search_a_single_matching_resource_on_non_existing_manifest(self):
+        response = self.client.get('/book1123456789/manifest/search/?q=top')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["error"], "'book1123456789' does not have a Manifest.")

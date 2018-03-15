@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from rest_framework_mongoengine.serializers import DocumentSerializer
 from iiif_api_services.models.CanvasModel import Canvas
+from rest_framework_mongoengine.serializers import DocumentSerializer
 
 
 class CanvasSerializer(DocumentSerializer):
@@ -16,7 +16,8 @@ class CanvasViewSerializer(DocumentSerializer):
 
     class Meta:
         model = Canvas
-        exclude = ('id', 'identifier', 'name', 'order', 'embeddedEntirely', 'belongsTo', 'hidden', 'ownedBy', 'children', )
+        exclude = ('id', 'identifier', 'name', 'order', 'embeddedEntirely',
+                   'belongsTo', 'hidden', 'ownedBy', 'children', )
 
 
 class CanvasEmbeddedSerializer(DocumentSerializer):
