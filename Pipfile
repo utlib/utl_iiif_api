@@ -4,7 +4,7 @@ verify_ssl = true
 
 [packages]
 
-djangorestframework = "==3.6.4"
+djangorestframework = "==3.9.1"
 "django-rest-framework-mongoengine" = "==3.3.1"
 mongoengine = "==0.9"
 pymongo = "==2.8"
